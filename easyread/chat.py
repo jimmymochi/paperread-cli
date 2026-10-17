@@ -203,6 +203,9 @@ def stream(ecfg: dict, text: str, cwd: Path, cancel: threading.Event, on_model=N
     try:
         if e == "claude":
             yield from _stream_claude(ecfg["claude"], text, cwd, cancel, on_model, meter)
+        elif e == "agy":
+            from .agy import stream as agy_stream
+            yield from agy_stream(ecfg["agy"], text, cancel, meter)
         elif e == "openai":
             yield from openai_api.stream(ecfg["openai"], text, cancel, meter)
         else:  # codex 没有逐字输出，整段给；不拉起用户的 MCP 和用不到的功能（见 codex_lean）

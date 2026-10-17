@@ -18,6 +18,10 @@ dist/
 .limits.json
 .prefs.json
 .models-seen.json
+.agy-models.json
+/test-data/
+/release-assets/
+/build-*.log
 /promo/
 
 # 本机工具和内部工作记录

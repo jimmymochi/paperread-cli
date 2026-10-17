@@ -17,7 +17,7 @@
     const c = s.cfg, e = c.engine;
     if (m.engine !== e) return false;
     if (["reasoning_effort", "service_tier"].some((k) => (m[k] || "") !== (c[e][k] || ""))) return false;
-    if (e === "claude" || e === "codex") return (m.model || "") === (c[e].model || "");
+    if (["claude", "codex", "agy"].includes(e)) return (m.model || "") === (c[e].model || "");
     const o = c.openai, p = preset(s, m.preset);
     return (m.preset || "") === (o.preset || "") && (m.model || "") === (o.model || "") &&
       (m.base_url || (p ? p.base_url : "")) === (o.base_url || "");
@@ -96,8 +96,16 @@
     const f = s.form;
     const card = (k, title) => '<button data-cmk="' + k + '" class="' + (f.kind === k ? "on" : "") + '"><b>' + title + "</b></button>";
     let h = '<div class="mc-form"><h4 class="set-h">' + (s.editing === "new" ? PR.t("添加模型") : PR.t("修改")) + "</h4>" +
-      '<div class="engine-cards small">' + card("claude", "Claude Code") + card("codex", "Codex CLI") + card("api", PR.t("API 接口")) + "</div>";
-    if (f.kind === "claude" || f.kind === "codex") {
+      '<div class="engine-cards small">' + card("agy", "Antigravity CLI") + card("codex", "Codex CLI") + card("claude", "Claude Code") + card("api", PR.t("API 接口")) + "</div>";
+    if (f.kind === "agy") {
+      const info = (s.models || {}).agy || {}, found = (s.found || {}).agy;
+      h += '<p class="hint">' + PR.t('使用本機 agy 的帳號登入，不需要 API Key。首次使用請先在終端機執行 agy 完成登入。') + '</p>' +
+        '<label class="field"><span>' + PR.t('模型') + '</span>' + PR.cliModelSelect(s, "agy", f.model, 'id="cmModel"') + '</label>' +
+        '<button class="btn sm" data-agy-refresh' + (s.agyLoading ? ' disabled' : '') + '>' + (s.agyLoading ? PR.t('正在讀取模型…') : PR.t('重新整理 AGY 模型')) + '</button>' +
+        '<p class="hint" role="status" aria-live="polite">' + PR.esc(s.agyMessage || info.error || (found && found.found ? PR.t('已偵測到 Antigravity CLI；模型清單來自你的帳號。') : PR.t('尚未偵測到 agy，請先安裝 CLI。'))) + '</p>' +
+        '<p class="hint"><a href="https://www.agy.dev/docs/cli/" target="_blank" rel="noopener">' + PR.t('Antigravity CLI 安裝與登入說明') + '</a></p>' +
+        '<details><summary>' + PR.t('自訂 CLI 路徑') + '</summary><label class="field"><span>' + PR.t('agy 執行檔') + '</span><input class="input" id="agyCommand" value="' + PR.esc(s.cfg.agy.command || 'agy') + '"></label></details>';
+    } else if (f.kind === "claude" || f.kind === "codex") {
       const found = (s.found || {})[f.kind];
       h += '<label class="field"><span>' + PR.t("模型") + "</span>" + PR.cliModelSelect(s, f.kind, f.model, 'id="cmModel"') + "</label>" +
         (found && !found.found ? '<p class="hint">' + PR.t("本机没找到 {name}", { name: f.kind === "claude" ? '<a href="https://docs.claude.com/en/docs/claude-code/setup" target="_blank" rel="noopener">Claude Code</a>' : "Codex CLI" }) + "</p>" : "");
@@ -109,6 +117,10 @@
       '<button class="btn sm" data-cm="cancel">' + (s.editing === "new" ? PR.t("取消") : PR.t("关闭")) + '</button>' + (s.editing === "new" ? '<button class="btn sm accent" data-cm="ok">' + PR.t("添加") + "</button>" : "") + "</div></div>";
   }
   function autoName(s, f) {
+    if (f.kind === "agy") {
+      const option = PR.cliModelOptions(s, "agy", f.model).find(([v]) => v === (f.model || ""));
+      return "AGY · " + (f.model ? (option ? option[1] : f.model) : PR.t("跟隨 CLI 預設"));
+    }
     if (f.kind === "claude" || f.kind === "codex") {  // 卡片名就是模型名
       const o = PR.cliModelOptions(s, f.kind, f.model).find(([v]) => v === (f.model || ""));
       return o ? o[1] : f.model || (f.kind === "claude" ? "Claude" : "GPT");
@@ -121,7 +133,7 @@
     return { engine: api ? "openai" : f.kind, preset: api ? f.preset : "",
       base_url: api && (!p || f.base_url !== p.base_url) ? f.base_url : "", api: api && (!p || f.api !== (p.api || "chat")) ? f.api : "", model: f.model, name, label: name,
       source: api ? (p ? p.name : "自定义地址") :  // i18n-ok 存进模型名单的来源名
-      f.kind === "claude" ? "Claude Code" : "Codex CLI",
+      f.kind === "agy" ? "Antigravity CLI" : f.kind === "claude" ? "Claude Code" : "Codex CLI",
       reasoning_effort: f.reasoning_effort || "", service_tier: f.kind === "claude" ? "" : f.service_tier || "",
       detail: f.model, ready: true };
   }
@@ -131,6 +143,7 @@
     const v = (id) => { const el = PR.$("#" + id); return el ? el.value.trim() : null; };
     if (isApi(f.kind)) PR.apiForm.read(root(), f, "key");
     else if (v("cmModel") !== null) f.model = v("cmModel");
+    if (f.kind === "agy" && v("agyCommand") !== null) s.cfg.agy.command = v("agyCommand") || "agy";
     for (const key of ["reasoning_effort", "service_tier"]) {
       const el = PR.$('[data-reasoning="' + key + '"]', root());
       if (el) f[key] = el.value;
@@ -140,7 +153,7 @@
     const p = m && preset(s, m.preset);
     s.form = m ? { kind: kindOf(m), model: m.model || "", preset: m.preset || "", base_url: m.base_url || (p ? p.base_url : ""), api: m.api || (p && p.api) || "chat", vision: false,
       name: "", key: "" }
-      : { kind: "claude", model: "opus", preset: "", base_url: "", api: "", name: "", key: "" };
+      : { kind: "agy", model: "", preset: "", base_url: "", api: "", name: "", key: "" };
     s.fetchMsg = null; s.apiTyping = false;
     s.form.reasoning_effort = m && m.reasoning_effort || "";
     s.form.service_tier = m && m.service_tier || "";
@@ -151,7 +164,7 @@
     const c = s.cfg, ti = transIndex(s), m = s.chat.models[ti];
     const e = c.engine;
     let h = '<h4 class="set-h">' + (m ? PR.t("翻译：{name}", { name: PR.esc(m.label || m.name) }) : PR.t("翻译")) + "</h4>";
-    if (m) h += '<p class="hint">' + PR.t("推理强度") + ': ' + PR.esc(m.reasoning_effort || PR.modelDefaultLabel(s, { kind: kindOf(m), model: m.model }, "reasoning_effort")) +
+    if (m && e !== "agy") h += '<p class="hint">' + PR.t("推理强度") + ': ' + PR.esc(m.reasoning_effort || PR.modelDefaultLabel(s, { kind: kindOf(m), model: m.model }, "reasoning_effort")) +
       (e === "claude" ? "" : ' · Fast: ' + PR.esc(m.service_tier || PR.modelDefaultLabel(s, { kind: kindOf(m), model: m.model }, "service_tier"))) + '</p>';
     if (e === "openai") h += '<label class="check" style="margin:0 0 10px"><input type="checkbox" data-k="openai.vision"' + (c.openai.vision ? " checked" : "") + ">" + PR.t("模型能看图") + "</label>";
     h += '<div class="grid2 translation-limits">' +
@@ -203,6 +216,7 @@
     },
     sync(s) { readForm(s); readTranslation(s); },
     change(e, s) {
+      if (e.target.id === "agyCommand") { readForm(s); PR.saveModelSettings(); return false; }
       if (e.target.dataset.k) { readTranslation(s); PR.saveModelSettings(); return false; }
       if (e.target.dataset.reasoning) { readForm(s); autoSaveForm(s); return true; }
       if (s.form && isApi(s.form.kind)) {
@@ -220,6 +234,17 @@
       return false;
     },
     async click(e, s) {
+      if (e.target.closest("[data-agy-refresh]")) {
+        readForm(s); await PR.saveModelSettings();
+        s.agyLoading = true; s.agyMessage = ""; PR.settingsRender();
+        try {
+          const r = await PR.api("/api/agy/models", { method: "POST", body: {} });
+          s.models = Object.assign({}, s.models, { agy: r.models }); s.found = r.found;
+          s.agyMessage = r.models.error || PR.t("已載入 {n} 個 AGY 模型。", {n: r.models.models.length});
+        } catch (err) { s.agyMessage = err.message; }
+        finally { s.agyLoading = false; }
+        return true;
+      }
       if (e.target.closest("#testBtn")) {
         readTranslation(s);
         const res = PR.$("#testRes");

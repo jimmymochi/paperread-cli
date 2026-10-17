@@ -1,4 +1,16 @@
-# PaperRead
+# PaperRead CLI（私人分享版）
+
+以 [YuriyLin/PaperRead v1.4.7](https://github.com/YuriyLin/PaperRead/releases/tag/v1.4.7) 為基礎的社群修改版。
+加入原生 **Antigravity CLI** 模型選單、串流回答與取消支援，保留 **Codex CLI**。
+兩者使用各自的 CLI 帳號登入，不需要在 PaperRead 填 API Key。
+
+Windows x64 安裝檔見[此儲存庫的 Releases](https://github.com/jimmymochi/paperread-cli/releases)。
+完整安裝、登入、資料位置與建置方式請見[分享版說明](分享版說明.md)。
+這是社群修改版，非 PaperRead、Google 或 OpenAI 官方發行版本。
+
+---
+
+# 上游 PaperRead 說明
 
 <p align="center">
   <img src="easyread/web/paperread-mark.png" width="88" alt="PaperRead">

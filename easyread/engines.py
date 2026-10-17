@@ -31,7 +31,7 @@ class Cancelled(RuntimeError):
     pass
 
 
-ENGINE_NAMES = {"claude": "Claude Code", "codex": "Codex CLI", "openai": "API", "none": "不翻译"}  # i18n-ok 显示时用 engine_name()
+ENGINE_NAMES = {"agy": "Antigravity CLI", "claude": "Claude Code", "codex": "Codex CLI", "openai": "API", "none": "不翻译"}  # i18n-ok 显示时用 engine_name()
 
 
 def engine_name(engine: str | None) -> str:
@@ -52,6 +52,9 @@ def run(cfg: dict, prompt: str, cwd: Path, images: list[Path] | None = None, can
 
 def _run(cfg: dict, prompt: str, cwd: Path, images: list[Path] | None, cancel: threading.Event | None, meter) -> str:
     engine = cfg.get("engine")
+    if engine == "agy":
+        from .agy import complete
+        return complete(cfg["agy"], prompt, cancel, meter)
     if engine == "claude":
         return run_claude(cfg["claude"], prompt, cwd, cancel, meter)
     if engine == "codex":
@@ -75,7 +78,7 @@ def who(cfg: dict) -> str:
     engine = cfg.get("engine")
     if engine == "openai":
         return cfg["openai"].get("model") or "API"
-    return {"claude": "claude", "codex": "codex"}.get(engine, "")
+    return {"claude": "claude", "codex": "codex", "agy": "Antigravity CLI"}.get(engine, "")
 
 
 # ---------- 本机 CLI ----------
@@ -90,7 +93,8 @@ def claude_path(c: dict) -> str | None:
 
 
 def codex_path(c: dict) -> str | None:
-    return shutil.which(c.get("command") or "codex")
+    from .agy import find_cli
+    return find_cli("codex", c.get("command", ""))
 
 
 def _popen(args: list[str], cwd: Path):

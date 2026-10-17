@@ -5,6 +5,7 @@
   const name = (v) => names()[v] || v;
   PR.chatEffort = {
     levels(m, catalog) {
+      if (m.engine === "agy") return []; // AGY model choices already include reasoning levels.
       if (m.engine === "claude") return /haiku/i.test(m.model || "") ? [] : ["low", "medium", "high", "xhigh", "max"];
       // Ollama's boolean-only thinking models (for example Qwen3.5) only support
       // thinking off/on; other effort labels all map to the same enabled state.

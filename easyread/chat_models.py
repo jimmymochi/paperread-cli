@@ -17,6 +17,7 @@ from .i18n import tr
 # opus / sonnet 是 Claude Code 的别名：它会用自己支持的最新版（升级 Claude Code 后自动变成 Opus 5.5 等），
 # 实际用的是哪个版本，第一次回答时记下来显示在名单上。
 DEFAULT_MODELS = [
+    {"id": "agy", "name": "AGY · 跟隨 CLI 預設", "engine": "agy", "model": ""},  # i18n-ok persisted model-card name
     {"id": "opus", "name": "Claude Opus", "engine": "claude", "model": "opus"},
     {"id": "sonnet", "name": "Claude Sonnet", "engine": "claude", "model": "sonnet"},
     {"id": "gpt", "name": "GPT", "engine": "codex", "model": ""},
@@ -51,7 +52,7 @@ def remember(alias: str, actual: str) -> None:
 def actual_of(alias: str) -> str:
     from .store import read_json
     return (read_json(_seen_path(), {}) or {}).get(alias, "")
-DEFAULT_CHAT = {"models": DEFAULT_MODELS, "default": "opus"}
+DEFAULT_CHAT = {"models": DEFAULT_MODELS, "default": "agy"}
 
 
 def codex_default_model() -> str:
@@ -94,7 +95,7 @@ def engine_cfg(cfg: dict, mid: str | None) -> tuple[dict, dict]:
     m = find(cfg, mid)
     out = copy.deepcopy(cfg)
     out["engine"] = m["engine"]
-    if m["engine"] in ("claude", "codex"):
+    if m["engine"] in ("claude", "codex", "agy"):
         out[m["engine"]]["model"] = m.get("model") or ""
         for key in ("reasoning_effort", "service_tier"):
             out[m["engine"]][key] = m.get(key) or ""
@@ -118,7 +119,7 @@ def translation_id(cfg: dict) -> str:
             continue
         if any((m.get(k) or "") != (cfg.get(e, {}).get(k) or "") for k in ("reasoning_effort", "service_tier")):
             continue
-        if e in ("claude", "codex") and (m.get("model") or "") == (cfg.get(e, {}).get("model") or ""):
+        if e in ("claude", "codex", "agy") and (m.get("model") or "") == (cfg.get(e, {}).get("model") or ""):
             return m["id"]
         if e == "openai":
             o = cfg.get("openai", {})
@@ -145,9 +146,9 @@ def listing(cfg: dict) -> dict:
     out = []
     for m in models(cfg):
         e = m.get("engine")
-        if e in ("claude", "codex"):
+        if e in ("claude", "codex", "agy"):
             ready = bool(found.get(e, {}).get("found"))
-            source = "Claude Code" if e == "claude" else "Codex CLI"
+            source = engines.engine_name(e)
             hint = "" if ready else tr("本机没找到 {source}", source=source)
         else:
             p = next((x for x in PRESETS if x["id"] == m.get("preset")), None)
@@ -166,7 +167,7 @@ def sanitize(items: list[dict]) -> list[dict]:
     out, seen = [], set()
     for k, m in enumerate(items or []):
         e = m.get("engine")
-        if e not in ("claude", "codex", "openai") or (e == "openai" and not (m.get("preset") or m.get("base_url"))):
+        if e not in ("claude", "codex", "agy", "openai") or (e == "openai" and not (m.get("preset") or m.get("base_url"))):
             continue
         mid = re.sub(r"[^\w\-]", "-", str(m.get("id") or f"m{k}"))[:40] or f"m{k}"
         while mid in seen:

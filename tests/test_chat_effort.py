@@ -6,6 +6,7 @@ from easyread import config, chat_options
 class ChatEffortTest(unittest.TestCase):
     def test_explicit_override_does_not_change_card_or_translation(self):
         saved = copy.deepcopy(config.DEFAULTS)
+        saved["engine"] = "claude"
         saved["claude"].update(model="opus", reasoning_effort="high")
         request = copy.deepcopy(saved)
         selected = chat_options.apply(request, {"reasoning_effort": "low"})
@@ -17,6 +18,7 @@ class ChatEffortTest(unittest.TestCase):
 
     def test_legacy_requests_and_invalid_levels(self):
         cfg = copy.deepcopy(config.DEFAULTS)
+        cfg["engine"] = "claude"
         self.assertEqual(chat_options.apply(cfg, None), {})
         with self.assertRaises(ValueError):
             chat_options.apply(cfg, {"reasoning_effort": "invalid"})

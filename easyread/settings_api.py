@@ -50,5 +50,11 @@ def list_models(body: dict) -> dict:
         return {"ok": False, "message": str(e)[:300]}
 
 
+def agy_models(body: dict) -> dict:
+    from . import agy, detect
+    cfg = config.load()
+    return {"models": agy.models(cfg["agy"], fresh=True), "found": detect.detect(cfg, fresh=True)}
+
+
 POST = {"/api/config": save_config, "/api/chat/models": save_chat_models,
-        "/api/config/test": test_engine, "/api/models/list": list_models}
+        "/api/config/test": test_engine, "/api/models/list": list_models, "/api/agy/models": agy_models}

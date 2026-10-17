@@ -10,7 +10,9 @@ def apply(ecfg: dict, options: dict | None) -> dict:
     if effort is not None:
         allowed = ["", "none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"]
         engine = ecfg["engine"]
-        if engine == "claude":
+        if engine == "agy":
+            allowed = ["", "low", "medium", "high", "xhigh", "max"]
+        elif engine == "claude":
             allowed = [""] if "haiku" in ecfg[engine].get("model", "") else ["", "low", "medium", "high", "xhigh", "max"]
         elif engine == "codex":
             listing = cli_models.codex()

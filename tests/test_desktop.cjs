@@ -158,7 +158,7 @@ const SHA = "a".repeat(64);
 test("paper links open the paper once the backend is ready", async () => {
   const d = await desktop("win32", true, true, [`easyread://open?sha256=${SHA}&block=p3-2`]);
   await d.settled();
-  assert.equal(d.app.protocol, "paperread");
+  assert.equal(d.app.protocol, "paperread-cli");
   assert.equal(d.windows[0].url, `http://127.0.0.1:9876/open?sha256=${SHA}&block=p3-2`);
   d.app.quit();
 });

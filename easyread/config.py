@@ -28,17 +28,18 @@ SERVER_INFO = HOME / ".server.json"
 DEFAULTS = {
     "library_dir": str(HOME / "library"),
     "port": 8765,
-    "engine": "claude",          # claude | codex（本机 CLI 无头）| openai（任意 OpenAI 兼容接口）| none
-    "auto_translate": True,      # 导入后自动开始翻译
+    "engine": "agy",             # agy | claude | codex | openai | none
+    "auto_translate": False,     # 使用者完成 CLI 登入後再自行啟用
     "target": "zh-TW",           # Translation language is independent of the interface.
     "target_locale_v": 1,
     "check_updates": False,      # 個人 fork 未設定自己的發佈庫前，不檢查或套用 upstream 更新
     "batch_pages": 2,            # 每次交给模型的页数
     "page_cap": 60,              # 全文超过多少页先确认；0 表示不限
-    "concurrency": 0,            # 同时译几段（分段并行，见 segments.py）；0 是自动，每段约 2 批、最多 4 段；手动最多 8 段
+    "concurrency": 1,            # CLI 預設逐段翻譯
     "concurrency_v": 2,          # 1.3.1 起 concurrency 的意思变了，旧配置的 1 当成自动，见 load
     "claude": {"command": "claude", "model": "", "reasoning_effort": "", "extra_args": [], "timeout": 1200},
     "codex": {"command": "codex", "model": "", "reasoning_effort": "", "service_tier": "", "extra_args": [], "timeout": 1200},
+    "agy": {"command": "agy", "model": "", "reasoning_effort": "", "service_tier": "", "timeout": 600},
     # api：chat（/chat/completions）| responses（/responses），见 openai_api.py
     "openai": {"preset": "", "base_url": "", "api": "chat", "api_key": "", "model": "", "vision": False, "timeout": 600},
     # 阅读页右侧“问 AI”的模型名单和默认模型，见 chat_models.py

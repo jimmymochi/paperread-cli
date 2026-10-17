@@ -108,7 +108,8 @@ def _probe(exe: str, version: str) -> None:
 
 
 def listing() -> dict:
-    return {"claude": claude(), "codex": codex()}
+    from . import agy, config
+    return {"claude": claude(), "codex": codex(), "agy": agy.models(config.load()["agy"])}
 
 
 def engine_label(cfg: dict) -> str:
@@ -122,6 +123,8 @@ def engine_label(cfg: dict) -> str:
         m = cfg["claude"].get("model") or ""
         actual = chat_models.actual_of(m) if m else ""
         model = chat_models.pretty(actual) if actual else ("Claude " + m.capitalize() if m in ("opus", "sonnet", "haiku") else m) if m else claude_default()
+    elif e == "agy":
+        model = cfg["agy"].get("model") or tr("跟隨 CLI 預設")
     elif e == "codex":
         model = chat_models.label({"engine": "codex", "model": cfg["codex"].get("model") or ""})
     else:

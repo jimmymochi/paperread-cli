@@ -6,7 +6,7 @@ import threading
 import time
 import urllib.request
 
-from . import engines
+from . import engines, agy
 
 _cache: dict = {}
 _lock = threading.Lock()
@@ -45,7 +45,8 @@ def _refresh(cfg: dict) -> dict:
         exe = finder(cfg[name])
         out[name] = {"found": bool(exe), "version": engines._version(exe) if exe else ""}
 
-    threads = [threading.Thread(target=cli, args=("claude", engines.claude_path)),
+    threads = [threading.Thread(target=cli, args=("agy", agy.path)),
+               threading.Thread(target=cli, args=("claude", engines.claude_path)),
                threading.Thread(target=cli, args=("codex", engines.codex_path)),
                threading.Thread(target=lambda: out.__setitem__("ollama", _ollama()))]
     for t in threads:
@@ -71,7 +72,7 @@ def needs_key(o: dict) -> bool:
 def ready(cfg: dict, found: dict) -> bool:
     """当前选的引擎看起来能用吗（首次引导据此提示）。"""
     e = cfg.get("engine")
-    if e in ("claude", "codex"):
+    if e in ("claude", "codex", "agy"):
         return bool(found.get(e, {}).get("found"))
     if e == "openai":
         o = cfg["openai"]

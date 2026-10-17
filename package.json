@@ -1,7 +1,7 @@
 {
-  "name": "paperread-desktop",
-  "version": "1.4.7",
-  "description": "PaperRead personal research workspace",
+  "name": "paperread-cli",
+  "version": "1.4.7-cli.1",
+  "description": "PaperRead community build with native Antigravity CLI and Codex support",
   "author": {
     "name": "YuriyLin"
   },
@@ -18,15 +18,14 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.edwardxlai.easyread",
-    "productName": "PaperRead",
+    "appId": "io.github.jimmymochi.paperread-cli",
+    "productName": "PaperRead CLI",
     "protocols": [
       {
-        "name": "PaperRead",
         "schemes": [
-          "easyread",
-          "paperread"
-        ]
+          "paperread-cli"
+        ],
+        "name": "PaperRead CLI"
       }
     ],
     "asar": true,
@@ -45,6 +44,18 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "LICENSE",
+        "to": "LICENSE-PaperRead.txt"
+      },
+      {
+        "from": "分享版說明.md",
+        "to": "分享版說明.md"
+      },
+      {
+        "from": "build/third-party-licenses",
+        "to": "third-party-licenses"
       }
     ],
     "win": {
@@ -64,12 +75,14 @@
       "createDesktopShortcut": true,
       "installerIcon": "electron/assets/paperread.ico",
       "uninstallerIcon": "electron/assets/paperread.ico",
-      "artifactName": "PaperRead-Setup-${version}.exe",
+      "artifactName": "PaperRead-CLI-Setup-${version}.exe",
       "installerLanguages": [
         "zh_TW",
         "en_US"
       ],
-      "language": "1028"
+      "language": "1028",
+      "runAfterFinish": false,
+      "license": "LICENSE"
     },
     "mac": {
       "icon": "electron/assets/icon.png",

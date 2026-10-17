@@ -3,14 +3,16 @@
 (function (PR) {
   "use strict";
   const FALLBACK = { claude: { models: [{ id: "opus", name: "Opus", desc: PR.t("最强") }, { id: "sonnet", name: "Sonnet", desc: PR.t("快、省") }, { id: "haiku", name: "Haiku", desc: PR.t("最快最省") }] },
-    codex: { default: "", models: [] } };
+    codex: { default: "", models: [] }, agy: { default: "", models: [] } };
   const lists = (s) => (s.models || FALLBACK);
 
   /* 下拉框的选项：[[value, label]]，选项就写模型名。Codex 一个模型都没查到时才留一项“Codex 默认” */
   PR.cliModelOptions = function (s, engine, value) {
     const L = lists(s)[engine] || FALLBACK[engine];
     let opts;
-    if (engine === "claude") {
+    if (engine === "agy") {
+      opts = [["", PR.t("跟隨 AGY CLI 預設")], ...L.models.map((m) => [m.id, m.name])];
+    } else if (engine === "claude") {
       opts = L.models.map((m) => [m.id, m.actual || "Claude " + m.name]);
     } else {
       opts = L.models.map((m) => [m.id, m.name]);
@@ -41,6 +43,7 @@
   };
 
   PR.modelReasoningFields = function (s, f) {
+    if (f.kind === "agy") return '<p class="hint">' + PR.t("推理強度包含在 AGY 模型選項中；選擇模型即可。") + '</p>';
     const L = lists(s)[f.kind] || {};
     const model = (L.models || []).find((m) => m.id === (f.model || L.default));
     let levels = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
