@@ -30,7 +30,30 @@
 .list-head .grow { flex: 1; }
 .sort { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3); }
 .sort select { width: auto; height: 30px; font-size: 13px; }
-.list { padding: 0 20px 60px; outline: 0; }
+.list { padding: 0 20px 190px; outline: 0; }
+
+/* Compact account quota card; details stay in Settings. */
+.home-quota { position: fixed; right: 16px; bottom: 16px; z-index: 5; width: 208px; padding: 10px 12px 8px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+.lib.has-detail .home-quota { right: 416px; }
+.hq-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hq-engines { display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--surface-2); }
+.hq-engines button { min-height: 30px; padding: 0 10px; border-radius: 5px; font-size: 12px; color: var(--ink-2); }
+.hq-engines button[aria-pressed="true"] { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.08); font-weight: 600; }
+.hq-refresh { width: 30px; height: 30px; border-radius: 6px; font-size: 21px; color: var(--ink-2); }
+.hq-refresh:hover { background: var(--accent-soft); }
+.hq-refresh:disabled { opacity: .45; }
+.home-quota button:focus-visible, .hq-group:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hq-group { width: 100%; height: 27px; margin-top: 7px; padding: 0 6px; border: 1px solid var(--rule); border-radius: 5px; background: var(--surface); color: var(--ink-2); font: 11.5px var(--ui); }
+.hq-values { display: grid; grid-template-columns: 1fr 1fr; margin-top: 9px; }
+.hq-window { display: flex; flex-direction: column; gap: 1px; }
+.hq-window + .hq-window { border-left: 1px solid var(--rule); padding-left: 16px; }
+.hq-window span { color: var(--ink-2); font-size: 11px; }
+.hq-window b { font-size: 21px; line-height: 1.3; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hq-window.low b { color: var(--danger); }
+.hq-window.stale b { color: var(--ink-2); }
+.hq-note { min-height: 15px; margin-top: 5px; font-size: 10.5px; color: var(--ink-2); }
+@media (max-width: 1100px) { .lib.has-detail .home-quota { right: 16px; z-index: 1; } }
+@media (max-width: 640px) { .home-quota { right: 10px; bottom: 10px; width: 196px; } }
 
 .row {
   display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 16px; align-items: start;
@@ -123,7 +146,7 @@
   .row .side-info { display: none; }
   .thumb { width: 40px; height: 52px; }
   .list-head { padding: 14px 16px 10px; }
-  .list { padding: 0 6px 60px; }
+  .list { padding: 0 6px 190px; }
 }
 
 /* 顶栏引擎状态 */

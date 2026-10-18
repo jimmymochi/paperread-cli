@@ -53,6 +53,7 @@
     L.items = d.items;
     L.render();
     schedule();
+    PR.emit("library-loaded");
   }
 
   let pollT;

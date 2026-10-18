@@ -6,8 +6,9 @@ const { test } = require('node:test');
 function setup(api = async () => ({})) {
   const PR = { t: (s, args={}) => s.replace(/\{(\w+)\}/g, (_,key) => String(args[key])),
     esc: s => String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;'),
-    on() {}, emit() {}, api, lang:'zh-TW' };
+    on() {}, emit() {}, api, lang:'zh-TW', $: () => null };
   for (const file of ['usage','quota']) vm.runInNewContext(fs.readFileSync('easyread/web/js/common/'+file+'.js','utf8'), {window:{PR}, Date});
+  vm.runInNewContext(fs.readFileSync('easyread/web/js/library/quota-summary.js','utf8'), {window:{PR}, Date});
   return PR;
 }
 
@@ -20,6 +21,63 @@ test('quotas show remaining capacity, actual windows, and escaped source names',
   assert.match(html,/aria-valuenow="78"/);
   assert.match(html,/&lt;script>/);
   assert.doesNotMatch(html,/<script>|5 小時/);
+});
+
+test('home summary keeps provider and AGY model groups separate', () => {
+  const PR = setup();
+  PR.quotaState.agy = {rows: [
+    {group:'Gemini Models',label:'Five Hour Limit Remaining',remaining_percent:80},
+    {group:'Gemini Models',label:'Weekly Limit Remaining',remaining_percent:60},
+    {group:'Claude and GPT models',label:'Weekly Limit Remaining',remaining_percent:20},
+  ]};
+  PR.quotaState.codex = {rows:[{group:'codex',window_minutes:10080,remaining_percent:74}]};
+  const gemini = PR.homeQuotaSnapshot('agy','Gemini Models');
+  assert.equal(gemini.windows.five.value,80);
+  assert.equal(gemini.windows.week.value,60);
+  const claude = PR.homeQuotaSnapshot('agy','Claude and GPT models');
+  assert.equal(claude.windows.week.value,20);
+  assert.equal(claude.windows.five,undefined);
+  assert.equal(PR.homeQuotaSnapshot('codex').windows.week.value,74);
+  assert.equal(PR.homeQuotaSnapshot('codex').windows.five,undefined);
+});
+
+test('home summary uses actual durations and never invents a missing 5hr window', () => {
+  const PR = setup();
+  PR.quotaState.codex = {rows:[
+    {group:'codex',label:'primary',window_minutes:10080,remaining_percent:70},
+    {group:'codex',label:'secondary',window_minutes:60,remaining_percent:95},
+    {group:'codex',label:'Five Hour Limit Remaining',remaining_percent:99},
+  ]};
+  const state = PR.homeQuotaSnapshot('codex');
+  assert.equal(state.windows.week.value,70);
+  assert.equal(state.windows.five,undefined);
+});
+
+test('home summary preserves zero while excluding null and non-finite values', () => {
+  const PR = setup();
+  assert.equal(Object.keys(PR.homeQuotaSnapshot('agy').windows).length,0);
+  PR.quotaState.codex = {rows:[
+    {window_minutes:300,remaining_percent:null},
+    {window_minutes:300,remaining_percent:NaN},
+    {window_minutes:10080,remaining_percent:0},
+  ]};
+  const state = PR.homeQuotaSnapshot('codex');
+  assert.equal(state.windows.five,undefined);
+  assert.equal(state.windows.week.value,0);
+});
+
+test('home summary labels expired and failed snapshots, and recovers a removed group', () => {
+  const PR = setup();
+  PR.quotaState.agy = {rows:[{group:'Gemini 4 Argon',label:'Gemini 4 Argon Weekly Limit',remaining_percent:30,resets_at:1}]};
+  let state = PR.homeQuotaSnapshot('agy','Removed group');
+  assert.equal(state.group,'Gemini 4 Argon');
+  assert.equal(state.windows.week.stale,true);
+  assert.equal(state.stale,true);
+  PR.quotaState.agy.rows[0].resets_at = Date.now()/1000+3600;
+  PR.quotaState.agy.status = 'stale';
+  state = PR.homeQuotaSnapshot('agy');
+  assert.equal(state.windows.week.value,30);
+  assert.equal(state.stale,true);
 });
 
 test('unknown quota is not rendered as zero and expired snapshots are labeled', () => {
@@ -60,4 +118,42 @@ test('concurrent refreshes are coalesced and failed refresh retains stale data',
   assert.equal(PR.quotaState.agy.rows[0].remaining_percent,91);
   assert.equal(PR.quotaState.agy.updated_at,123);
   assert.match(PR.quotaHtml('agy'),/上次剩餘 91%/);
+});
+
+test('home refresh waits for library authentication, caches switches, and pauses when hidden', async () => {
+  let now = 1000000, nextId = 0;
+  const events = {}, visibility = {}, timers = new Map(), stored = new Map(), calls = [];
+  const node = () => ({innerHTML:'',value:'',hidden:false,setAttribute(){},addEventListener(name,fn){this[name]=fn;}});
+  const nodes = Object.fromEntries(['.hq-group','.hq-refresh','.hq-values','.hq-note'].map(key => [key,node()]));
+  const host = {...node(),querySelector:key => nodes[key],querySelectorAll:() => []};
+  const doc = {hidden:false,addEventListener(name,fn){visibility[name]=fn;}};
+  const PR = setup();
+  Object.assign(PR, {
+    $:() => host, lib:{engine:'agy'},
+    ls:{get:(key,fallback) => stored.get(key) ?? fallback,set:(key,value) => stored.set(key,value)},
+    on:(event,fn) => {events[event]=fn;},
+    loadQuota:async (engine,force) => { calls.push([engine,force]); PR.quotaState[engine] = {checked_at:now/1000}; },
+  });
+  vm.runInNewContext(fs.readFileSync('easyread/web/js/library/quota-summary.js','utf8'), {
+    window:{PR},document:doc,Date:{now:() => now},
+    setTimeout:(fn,delay) => {const id=++nextId;timers.set(id,{fn,delay});return id;},clearTimeout:id => timers.delete(id),
+  });
+  const settle = () => new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls.length,0);
+  events['library-loaded'](); await settle();
+  assert.equal(calls.length,1);
+  assert.equal(calls[0][0],'agy');
+  events['library-loaded'](); await settle();
+  assert.equal(calls.length,1);
+  const choose = engine => host.click({target:{closest:selector => selector === '[data-hq-engine]' ? {dataset:{hqEngine:engine}} : null}});
+  choose('codex'); await settle();
+  choose('agy'); await settle();
+  assert.equal(calls.length,2);
+  assert.equal(stored.get('paperread-home-quota-engine'),'agy');
+  doc.hidden=true; visibility.visibilitychange();
+  assert.equal(timers.size,0);
+  now+=300001; doc.hidden=false; visibility.visibilitychange(); await settle();
+  assert.equal(calls.length,3);
+  host.click({target:{closest:selector => selector === '.hq-refresh' ? {} : null}}); await settle();
+  assert.equal(calls.at(-1)[1],true);
 });

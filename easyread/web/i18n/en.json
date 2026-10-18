@@ -1846,5 +1846,12 @@
  "AGY 未成功完成請求。": "AGY did not complete the request.",
  "AGY 未回傳回答。": "AGY returned no answer.",
  "AGY 回覆逾時，請稍後重試。": "AGY timed out. Try again later.",
- "AGY 連線中斷，請確認 CLI 登入狀態。": "AGY disconnected. Check your CLI sign-in."
+ "AGY 連線中斷，請確認 CLI 登入狀態。": "AGY disconnected. Check your CLI sign-in.",
+ "額度來源": "Quota provider",
+ "額度群組": "Quota group",
+ "未提供此時段額度": "Quota for this window is not available",
+ "更新中…": "Refreshing…",
+ "* 上次資料": "* Last known quota",
+ "剩餘額度": "Remaining quota",
+ "額度暫不可用": "Quota unavailable"
 }
