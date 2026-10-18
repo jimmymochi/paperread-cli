@@ -135,13 +135,17 @@
     render();
     persist();
   });
-  handle.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0 || !event.isPrimary) return;
+  host.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || event.isPrimary === false) return;
+    const control = event.target.closest("button, select, input, a, textarea, [contenteditable]");
+    if (control && control !== handle) return;
+    event.preventDefault();
+    if (control === handle) handle.focus({ preventScroll: true });
     const rect = host.getBoundingClientRect();
     drag = { id: event.pointerId, x: event.clientX, y: event.clientY, left: rect.left, top: rect.top, moved: false };
-    handle.setPointerCapture(event.pointerId);
+    host.setPointerCapture(event.pointerId);
   });
-  handle.addEventListener("pointermove", (event) => {
+  host.addEventListener("pointermove", (event) => {
     if (!drag || event.pointerId !== drag.id) return;
     const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
@@ -154,10 +158,10 @@
     const moved = drag.moved;
     drag = null;
     if (moved) persist();
-    if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+    if (host.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId);
     host.classList.remove("dragging");
   }
-  ["pointerup", "pointercancel", "lostpointercapture"].forEach((name) => handle.addEventListener(name, endDrag));
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach((name) => host.addEventListener(name, endDrag));
   handle.addEventListener("keydown", (event) => {
     const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
     if (event.key === "Home") { position = null; place(); }

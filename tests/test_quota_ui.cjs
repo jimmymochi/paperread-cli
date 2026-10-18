@@ -123,7 +123,7 @@ test('concurrent refreshes are coalesced and failed refresh retains stale data',
 function homeHarness() {
   let now = 1000000, nextId = 0;
   const events = {}, visibility = {}, timers = new Map(), stored = new Map(), calls = [], savedPrefs = [];
-  const node = () => ({innerHTML:'',value:'',hidden:false,setAttribute(){},addEventListener(name,fn){this[name]=fn;},setPointerCapture(){},hasPointerCapture(){return false;}});
+  const node = () => ({innerHTML:'',value:'',hidden:false,setAttribute(){},addEventListener(name,fn){this[name]=fn;},focus(){},setPointerCapture(){},hasPointerCapture(){return false;}});
   const nodes = Object.fromEntries(['.hq-group','.hq-refresh','.hq-values','.hq-note','.hq-drag','.hq-toggle','#homeQuotaBody'].map(key => [key,node()]));
   const host = {...node(),style:{},classList:{toggle(){},add(){},remove(){}},querySelector:key => nodes[key],querySelectorAll:() => [],
     getBoundingClientRect(){return {width:208,height:180,left:parseFloat(this.style.left)||700,top:parseFloat(this.style.top)||500};}};
@@ -185,19 +185,20 @@ test('collapsed cards restore from server preferences, pause queries, and save e
   assert.equal(p.savedPrefs.at(-1).patch.quota_card.collapsed,true);
 });
 
-test('dragging clamps to the viewport, survives resize, and Home resets the position', () => {
+test('dragging from the card body clamps to the viewport, survives resize, and Home resets the position', () => {
   const p = homeHarness();
   p.events['library-prefs']({}); p.events['library-loaded']();
   const handle = p.nodes['.hq-drag'];
-  handle.pointerdown({button:0,isPrimary:true,pointerId:7,clientX:750,clientY:520});
-  handle.pointermove({pointerId:7,clientX:-300,clientY:-300});
-  handle.pointerup({pointerId:7});
+  const down = {button:0,isPrimary:true,target:{closest:()=>null},preventDefault(){}};
+  p.host.pointerdown({...down,pointerId:7,clientX:750,clientY:520});
+  p.host.pointermove({pointerId:7,clientX:-300,clientY:-300});
+  p.host.pointerup({pointerId:7});
   assert.equal(p.host.style.left,'8px');
   assert.equal(p.host.style.top,'8px');
   assert.deepEqual(p.savedPrefs.at(-1).patch.quota_card.position,{x:0,y:0});
-  handle.pointerdown({button:0,isPrimary:true,pointerId:8,clientX:20,clientY:20});
-  handle.pointermove({pointerId:8,clientX:3000,clientY:3000});
-  handle.pointercancel({pointerId:8});
+  p.host.pointerdown({...down,pointerId:8,clientX:20,clientY:20});
+  p.host.pointermove({pointerId:8,clientX:3000,clientY:3000});
+  p.host.pointercancel({pointerId:8});
   assert.equal(p.host.style.left,'784px');
   assert.equal(p.host.style.top,'612px');
   p.win.innerWidth=400; p.win.innerHeight=300; p.win.resize();
@@ -206,4 +207,21 @@ test('dragging clamps to the viewport, survives resize, and Home resets the posi
   handle.keydown({key:'Home',preventDefault(){},stopPropagation(){}});
   assert.equal(p.host.style.left,'');
   assert.equal(p.savedPrefs.at(-1).patch.quota_card.position,null);
+});
+
+test('quota controls remain clickable while the title and empty space can be dragged', () => {
+  const p = homeHarness();
+  p.events['library-prefs']({}); p.events['library-loaded']();
+  let prevented=0;
+  const down = {button:0,isPrimary:true,pointerId:2,clientX:700,clientY:500,preventDefault(){prevented++;}};
+  p.host.pointerdown({...down,target:{closest:()=>p.nodes['.hq-group']}});
+  p.host.pointermove({pointerId:2,clientX:200,clientY:200});
+  p.host.pointerup({pointerId:2});
+  assert.equal(prevented,0);
+  assert.equal(p.savedPrefs.length,0);
+  p.host.pointerdown({...down,target:{closest:()=>p.nodes['.hq-drag']}});
+  p.host.pointermove({pointerId:2,clientX:200,clientY:200});
+  p.host.pointerup({pointerId:2});
+  assert.equal(prevented,1);
+  assert.equal(p.savedPrefs.at(-1).patch.quota_card.position.x>0,true);
 });

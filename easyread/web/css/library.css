@@ -35,6 +35,9 @@
 /* Compact account quota card; details stay in Settings. */
 .home-quota { position: fixed; right: 16px; bottom: 16px; z-index: 60; width: 208px; max-width: calc(100vw - 16px); padding: 8px 12px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
 .lib.has-detail .home-quota { right: 416px; }
+.home-quota { cursor: grab; touch-action: none; user-select: none; }
+.home-quota.dragging, .home-quota.dragging * { cursor: grabbing; }
+.home-quota button, .home-quota select { touch-action: manipulation; }
 .hq-titlebar { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
 .hq-drag { flex: 1; min-width: 0; min-height: 26px; text-align: left; color: var(--ink-2); font-size: 11px; cursor: grab; touch-action: none; user-select: none; }
 .hq-drag::before { content: "⠿"; margin-right: 5px; color: var(--ink-3); }
