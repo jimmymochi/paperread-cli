@@ -231,7 +231,7 @@
   window.addEventListener("pageshow", (e) => { if (e.persisted) L.load().then(restoreReturn).catch(() => {}); });
   // 等侧栏、详情这些脚本都加载完再取数据：数据先到、脚本还没到时会出错
   document.addEventListener("DOMContentLoaded", () => {
-    const prefsReady = PR.loadPrefs().then((p) => { if (p.reader && p.reader.theme) PR.applyTheme(p.reader.theme); PR.useServerUi(p); L.useServerSide(p); }).catch(() => {});
+    const prefsReady = PR.loadPrefs().then((p) => { if (p.reader && p.reader.theme) PR.applyTheme(p.reader.theme); PR.useServerUi(p); L.useServerSide(p); PR.emit("library-prefs", p); }).catch(() => { PR.emit("library-prefs", {}); });
     try {
       const snap = JSON.parse(sessionStorage.getItem("easyread-lib-snap") || "null");
       sessionStorage.removeItem("easyread-lib-snap");

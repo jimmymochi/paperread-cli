@@ -120,40 +120,90 @@ test('concurrent refreshes are coalesced and failed refresh retains stale data',
   assert.match(PR.quotaHtml('agy'),/上次剩餘 91%/);
 });
 
-test('home refresh waits for library authentication, caches switches, and pauses when hidden', async () => {
+function homeHarness() {
   let now = 1000000, nextId = 0;
-  const events = {}, visibility = {}, timers = new Map(), stored = new Map(), calls = [];
-  const node = () => ({innerHTML:'',value:'',hidden:false,setAttribute(){},addEventListener(name,fn){this[name]=fn;}});
-  const nodes = Object.fromEntries(['.hq-group','.hq-refresh','.hq-values','.hq-note'].map(key => [key,node()]));
-  const host = {...node(),querySelector:key => nodes[key],querySelectorAll:() => []};
+  const events = {}, visibility = {}, timers = new Map(), stored = new Map(), calls = [], savedPrefs = [];
+  const node = () => ({innerHTML:'',value:'',hidden:false,setAttribute(){},addEventListener(name,fn){this[name]=fn;},setPointerCapture(){},hasPointerCapture(){return false;}});
+  const nodes = Object.fromEntries(['.hq-group','.hq-refresh','.hq-values','.hq-note','.hq-drag','.hq-toggle','#homeQuotaBody'].map(key => [key,node()]));
+  const host = {...node(),style:{},classList:{toggle(){},add(){},remove(){}},querySelector:key => nodes[key],querySelectorAll:() => [],
+    getBoundingClientRect(){return {width:208,height:180,left:parseFloat(this.style.left)||700,top:parseFloat(this.style.top)||500};}};
   const doc = {hidden:false,addEventListener(name,fn){visibility[name]=fn;}};
   const PR = setup();
   Object.assign(PR, {
     $:() => host, lib:{engine:'agy'},
     ls:{get:(key,fallback) => stored.get(key) ?? fallback,set:(key,value) => stored.set(key,value)},
+    savePrefs:(section,patch) => savedPrefs.push(JSON.parse(JSON.stringify({section,patch}))),
     on:(event,fn) => {events[event]=fn;},
     loadQuota:async (engine,force) => { calls.push([engine,force]); PR.quotaState[engine] = {checked_at:now/1000}; },
   });
+  const win = {PR,innerWidth:1000,innerHeight:800,addEventListener(name,fn){this[name]=fn;}};
   vm.runInNewContext(fs.readFileSync('easyread/web/js/library/quota-summary.js','utf8'), {
-    window:{PR},document:doc,Date:{now:() => now},
+    window:win,document:doc,Date:{now:() => now},
     setTimeout:(fn,delay) => {const id=++nextId;timers.set(id,{fn,delay});return id;},clearTimeout:id => timers.delete(id),
   });
+  const click = selector => host.click({target:{closest:s => s===selector ? {} : null}});
+  const choose = engine => host.click({target:{closest:selector => selector === '[data-hq-engine]' ? {dataset:{hqEngine:engine}} : null}});
+  return {events,visibility,timers,stored,calls,nodes,host,doc,PR,win,savedPrefs,click,choose,advance:ms => {now+=ms;}};
+}
+
+test('home refresh waits for preferences and authentication, caches switches, and pauses when hidden', async () => {
+  const {events,visibility,timers,stored,calls,doc,choose,click,advance} = homeHarness();
   const settle = () => new Promise(resolve => setImmediate(resolve));
   assert.equal(calls.length,0);
   events['library-loaded'](); await settle();
+  assert.equal(calls.length,0);
+  events['library-prefs']({}); await settle();
   assert.equal(calls.length,1);
   assert.equal(calls[0][0],'agy');
   events['library-loaded'](); await settle();
   assert.equal(calls.length,1);
-  const choose = engine => host.click({target:{closest:selector => selector === '[data-hq-engine]' ? {dataset:{hqEngine:engine}} : null}});
   choose('codex'); await settle();
   choose('agy'); await settle();
   assert.equal(calls.length,2);
   assert.equal(stored.get('paperread-home-quota-engine'),'agy');
   doc.hidden=true; visibility.visibilitychange();
   assert.equal(timers.size,0);
-  now+=300001; doc.hidden=false; visibility.visibilitychange(); await settle();
+  advance(300001); doc.hidden=false; visibility.visibilitychange(); await settle();
   assert.equal(calls.length,3);
-  host.click({target:{closest:selector => selector === '.hq-refresh' ? {} : null}}); await settle();
+  click('.hq-refresh'); await settle();
   assert.equal(calls.at(-1)[1],true);
+});
+
+test('collapsed cards restore from server preferences, pause queries, and save expansion', async () => {
+  const p = homeHarness();
+  p.events['library-prefs']({library:{quota_card:{engine:'codex',collapsed:true,position:{x:0,y:0},groups:{agy:'Gemini Models'}}}});
+  p.events['library-loaded']();
+  assert.equal(p.nodes['#homeQuotaBody'].hidden,true);
+  assert.equal(p.calls.length,0);
+  assert.equal(p.host.style.left,'8px');
+  p.click('.hq-toggle'); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(p.nodes['#homeQuotaBody'].hidden,false);
+  assert.equal(p.calls[0][0],'codex');
+  assert.equal(p.savedPrefs.at(-1).patch.quota_card.collapsed,false);
+  p.click('.hq-toggle');
+  assert.equal(p.timers.size,0);
+  assert.equal(p.savedPrefs.at(-1).patch.quota_card.collapsed,true);
+});
+
+test('dragging clamps to the viewport, survives resize, and Home resets the position', () => {
+  const p = homeHarness();
+  p.events['library-prefs']({}); p.events['library-loaded']();
+  const handle = p.nodes['.hq-drag'];
+  handle.pointerdown({button:0,isPrimary:true,pointerId:7,clientX:750,clientY:520});
+  handle.pointermove({pointerId:7,clientX:-300,clientY:-300});
+  handle.pointerup({pointerId:7});
+  assert.equal(p.host.style.left,'8px');
+  assert.equal(p.host.style.top,'8px');
+  assert.deepEqual(p.savedPrefs.at(-1).patch.quota_card.position,{x:0,y:0});
+  handle.pointerdown({button:0,isPrimary:true,pointerId:8,clientX:20,clientY:20});
+  handle.pointermove({pointerId:8,clientX:3000,clientY:3000});
+  handle.pointercancel({pointerId:8});
+  assert.equal(p.host.style.left,'784px');
+  assert.equal(p.host.style.top,'612px');
+  p.win.innerWidth=400; p.win.innerHeight=300; p.win.resize();
+  assert.equal(p.host.style.left,'184px');
+  assert.equal(p.host.style.top,'112px');
+  handle.keydown({key:'Home',preventDefault(){},stopPropagation(){}});
+  assert.equal(p.host.style.left,'');
+  assert.equal(p.savedPrefs.at(-1).patch.quota_card.position,null);
 });

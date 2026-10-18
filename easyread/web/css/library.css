@@ -30,11 +30,19 @@
 .list-head .grow { flex: 1; }
 .sort { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3); }
 .sort select { width: auto; height: 30px; font-size: 13px; }
-.list { padding: 0 20px 190px; outline: 0; }
+.list { padding: 0 20px 220px; outline: 0; }
 
 /* Compact account quota card; details stay in Settings. */
-.home-quota { position: fixed; right: 16px; bottom: 16px; z-index: 5; width: 208px; padding: 10px 12px 8px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+.home-quota { position: fixed; right: 16px; bottom: 16px; z-index: 60; width: 208px; max-width: calc(100vw - 16px); padding: 8px 12px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
 .lib.has-detail .home-quota { right: 416px; }
+.hq-titlebar { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.hq-drag { flex: 1; min-width: 0; min-height: 26px; text-align: left; color: var(--ink-2); font-size: 11px; cursor: grab; touch-action: none; user-select: none; }
+.hq-drag::before { content: "⠿"; margin-right: 5px; color: var(--ink-3); }
+.home-quota.dragging .hq-drag { cursor: grabbing; }
+.hq-toggle { flex: none; width: 26px; height: 26px; border-radius: 5px; font-size: 18px; color: var(--ink-2); }
+.hq-toggle:hover { background: var(--accent-soft); }
+.home-quota.collapsed { width: 164px; }
+.home-quota.collapsed .hq-titlebar { margin-bottom: 0; }
 .hq-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .hq-engines { display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--surface-2); }
 .hq-engines button { min-height: 30px; padding: 0 10px; border-radius: 5px; font-size: 12px; color: var(--ink-2); }
@@ -52,7 +60,7 @@
 .hq-window.low b { color: var(--danger); }
 .hq-window.stale b { color: var(--ink-2); }
 .hq-note { min-height: 15px; margin-top: 5px; font-size: 10.5px; color: var(--ink-2); }
-@media (max-width: 1100px) { .lib.has-detail .home-quota { right: 16px; z-index: 1; } }
+@media (max-width: 1100px) { .lib.has-detail .home-quota { right: 16px; } }
 @media (max-width: 640px) { .home-quota { right: 10px; bottom: 10px; width: 196px; } }
 
 .row {
@@ -146,7 +154,7 @@
   .row .side-info { display: none; }
   .thumb { width: 40px; height: 52px; }
   .list-head { padding: 14px 16px 10px; }
-  .list { padding: 0 6px 190px; }
+  .list { padding: 0 6px 220px; }
 }
 
 /* 顶栏引擎状态 */

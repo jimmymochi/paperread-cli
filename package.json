@@ -1,6 +1,6 @@
 {
   "name": "paperread-cli",
-  "version": "1.4.7-cli.3",
+  "version": "1.4.7-cli.4",
   "description": "PaperRead community build with native Antigravity CLI and Codex support",
   "author": {
     "name": "YuriyLin"

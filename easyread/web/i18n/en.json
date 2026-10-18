@@ -1853,5 +1853,8 @@
  "更新中…": "Refreshing…",
  "* 上次資料": "* Last known quota",
  "剩餘額度": "Remaining quota",
- "額度暫不可用": "Quota unavailable"
+ "額度暫不可用": "Quota unavailable",
+ "拖曳移動；方向鍵微調；Home 歸位": "Drag to move; arrow keys to adjust; Home to reset",
+ "展開額度卡": "Expand quota card",
+ "收起額度卡": "Collapse quota card"
 }
