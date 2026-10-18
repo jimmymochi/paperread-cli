@@ -1,16 +1,30 @@
-# PaperRead CLI（私人分享版）
+# PaperRead CLI（社群修改版）
 
-以 [YuriyLin/PaperRead v1.4.7](https://github.com/YuriyLin/PaperRead/releases/tag/v1.4.7) 為基礎的社群修改版。
+## 原作來源與修改聲明
+
+**本專案是在他人作品上修改的衍生版本，並非 jimmymochi 從零開發的原創作品。**
+
+- 直接上游：[YuriyLin/PaperRead](https://github.com/YuriyLin/PaperRead)，本版以 [v1.4.7](https://github.com/YuriyLin/PaperRead/releases/tag/v1.4.7) 為基礎。
+- 更早的基礎：PaperRead 延續 EasyRead 的論文閱讀與批註功能；感謝原作者與歷來貢獻者。
+- 原有 [MIT 授權與版權聲明](LICENSE)完整保留，包括 `Copyright (c) 2026 LiangXiLin`。上游功能與貢獻歸原作者及各貢獻者所有。
+- 本儲存庫由 [jimmymochi](https://github.com/jimmymochi) 維護，修改範圍主要為原生 Antigravity CLI 整合、Codex／AGY 額度顯示與可拖曳額度卡，以及獨立的 Windows 安裝與資料目錄。
+
+這是非官方社群修改版，與上游作者、Google 或 OpenAI 無官方隸屬或背書關係。
+
+## 本版下載與使用
+
 加入原生 **Antigravity CLI** 模型選單、串流回答與取消支援，保留 **Codex CLI**。
 兩者使用各自的 CLI 帳號登入，不需要在 PaperRead 填 API Key。
 
 Windows x64 安裝檔見[此儲存庫的 Releases](https://github.com/jimmymochi/paperread-cli/releases)。
 完整安裝、登入、資料位置與建置方式請見[分享版說明](分享版說明.md)。
-這是社群修改版，非 PaperRead、Google 或 OpenAI 官方發行版本。
+本版問題請回報至[本儲存庫 Issues](https://github.com/jimmymochi/paperread-cli/issues)。
 
 ---
 
 # 上游 PaperRead 說明
+
+以下保留上游 PaperRead 的功能與使用說明；其中的上游下載、平台支援及功能介紹屬於原作，PaperRead CLI 的安裝方式請以上方連結與分享版說明為準。
 
 <p align="center">
   <img src="easyread/web/paperread-mark.png" width="88" alt="PaperRead">

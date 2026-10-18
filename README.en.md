@@ -1,4 +1,23 @@
-# PaperRead
+# PaperRead CLI (community modification)
+
+## Attribution and modifications
+
+**This project modifies other people's work. It is not an original application built from scratch by jimmymochi.**
+
+- Direct upstream: [YuriyLin/PaperRead](https://github.com/YuriyLin/PaperRead), based on [v1.4.7](https://github.com/YuriyLin/PaperRead/releases/tag/v1.4.7).
+- Earlier foundation: PaperRead builds on EasyRead's paper reading and annotation features. Credit belongs to the original authors and contributors.
+- The original [MIT license and copyright notice](LICENSE), including `Copyright (c) 2026 LiangXiLin`, are preserved.
+- [jimmymochi](https://github.com/jimmymochi) maintains this derivative. Its changes focus on native Antigravity CLI integration, Codex/AGY quota displays and a draggable quota card, plus a separate Windows installer and data directory.
+
+This is an unofficial community modification, with no official affiliation with or endorsement by the upstream authors, Google, or OpenAI.
+
+Download this build from [this repository's Releases](https://github.com/jimmymochi/paperread-cli/releases). See the [installation guide (Traditional Chinese)](分享版說明.md) and report issues to [this repository](https://github.com/jimmymochi/paperread-cli/issues).
+
+---
+
+# Upstream PaperRead documentation
+
+The following documentation describes the upstream project. Its downloads, platform support, and features refer to PaperRead; use the links above for PaperRead CLI installation.
 
 <p align="center">
   <img src="easyread/web/paperread-mark.png" width="72" alt="PaperRead">
