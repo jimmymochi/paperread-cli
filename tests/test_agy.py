@@ -54,7 +54,7 @@ def test_catalog_cache_and_failure(tmp_path):
 def fake_cli(tmp_path, body):
     file = tmp_path / "fake_agy.py"
     file.write_text("import sys,json,time\nrequest=json.loads(sys.stdin.readline())\n" + body, encoding="utf-8")
-    return patch.object(agy, "argv", return_value=[sys.executable, str(file)])
+    return patch.object(agy, "argv", return_value=[sys.executable, "-X", "utf8", str(file)])
 
 
 def test_stream_unicode_deduplicates_and_tracks_usage(tmp_path):

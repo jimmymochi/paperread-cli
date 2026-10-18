@@ -75,6 +75,7 @@
 
   const thread = () => st.threads.find((t) => t.id === st.cur) || null;
   const modelOf = (id) => st.models.find((m) => m.id === id) || st.models[0] || { label: PR.t("模型") };
+  PR.on("quota-updated", (engine) => { if (st.usageOpen && modelOf(st.model).engine === engine) render(); });
 
   function plainTex(t) {
     return (t || "").replace(/\$\$?([^$]*)\$\$?/g, (m, x) => x.replace(/\\([a-zA-Z]+)\s*/g, (y, name) => ({ mu: "μ", sigma: "σ", epsilon: "ε", alpha: "α", beta: "β", theta: "θ", pi: "π", sum: "Σ", mid: "|", succ: "≻", log: "log ", exp: "exp " })[name] || "").replace(/[{}\\^_]/g, ""));
@@ -153,8 +154,8 @@
     return '<div class="ch-compose">' + (chips ? '<div class="ch-chips">' + chips + "</div>" : "") +
       '<textarea id="chatInput" rows="1" placeholder="' + PR.t("问点什么…") + '">' + PR.esc(st.draft) + "</textarea>" +
       '<div class="ch-bar"><button class="ch-model" data-c="menu" title="' + PR.t("换模型和思考强度") + '"' + (st.streaming ? ' disabled' : '') + '>' + PR.esc(m.label) + PR.chatEffort.suffix(st, m) + PR.icon("chevron", "sm") + "</button>" + style + menu +
-      '<span class="grow"></span>' + PR.usageChip(st.limits, thread() && thread().messages, st.usageOpen) +
-      (st.usageOpen ? PR.usagePop(st.limits, thread() && thread().messages) : "") + (st.streaming ? '<button class="ch-send stop" data-c="stop" title="' + PR.t("停止") + '">' + PR.icon("stop", "sm") + "</button>"
+      '<span class="grow"></span><button class="us-chip' + (st.usageOpen ? ' on' : '') + '" data-c="usage" aria-expanded="' + st.usageOpen + '">' + PR.t("額度 / 用量") + '</button>' +
+      (st.usageOpen ? PR.usagePop(st.limits, thread() && thread().messages, m.engine) : "") + (st.streaming ? '<button class="ch-send stop" data-c="stop" title="' + PR.t("停止") + '">' + PR.icon("stop", "sm") + "</button>"
         : '<button class="ch-send" data-c="send" title="' + PR.t("发送（Enter）；换行用 Shift+Enter") + '">' + PR.icon("arrowUp", "sm") + "</button>") + "</div></div>";
   }
   function render() {
@@ -259,7 +260,8 @@
     }
     if (c === "effort-level") { if (st.streaming) return; const m = modelOf(st.model); st.chatOptions.reasoning_effort = b.dataset.effort === PR.chatEffort.fallback(st, m) && !m.reasoning_effort ? "" : b.dataset.effort; return render(); }  // 菜单不关；点的就是默认档就不传，跟着 CLI
     if (c === "menu") { st.menuOpen = !st.menuOpen; st.listOpen = st.usageOpen = false; return render(); }
-    if (c === "usage") { st.usageOpen = !st.usageOpen; st.listOpen = st.menuOpen = false; return render(); }
+    if (c === "usage") { st.usageOpen = !st.usageOpen; st.listOpen = st.menuOpen = false; render(); if (st.usageOpen) PR.loadQuota(modelOf(st.model).engine); return; }
+    if (c === "quota-refresh") { PR.loadQuota(modelOf(st.model).engine, true); return; }
     if (c === "model") { if (st.streaming) return; st.chatOptions = {}; st.model = b.dataset.m; st.menuOpen = false; return render(); }
     if (c === "manage") { st.menuOpen = false; render(); return PR.openSettings("chat"); }
     if (c === "send") return send(PR.$("#chatInput").value);

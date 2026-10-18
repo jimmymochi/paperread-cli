@@ -98,12 +98,13 @@ window.PR = window.PR || {};
 
   /* 上下文条（学 Claude 的 Context window）：最近一次回答时发给模型的全部内容。每次提问都会连同之前的对话一起发，
      所以看的是“当前对话多大”，不是累计。分三段：缓存命中的（系统提示、之前的对话）、这次新发的、模型的回答。
-     不知道模型上下文多大时（API、Codex），条按 20 万算，右边只写 token 数 */
+     不知道模型上下文上限时，只显示最近请求 token 数，不画估算容量条。 */
   function contextHtml(msgs) {
     const last = (msgs || []).map((m) => m.usage).filter((u) => u && u.calls && u.context).pop();
     if (!last) return '<div class="us-ctx"><div class="us-row"><span>' + PR.t("上下文") + "</span><em>" + PR.t("还没提问") + '</em></div><div class="us-bar"></div></div>';
     const c = last.context, total = c.cached + c.fresh + c.output, win = last.context_window;
-    const scale = win || Math.max(200000, total);
+    if (!win) return '<div class="us-ctx"><div class="us-row"><span>' + PR.t("最近一次呼叫") + '</span><em>' + tokens(total) + ' token</em></div><p class="us-foot">' + PR.t("CLI 未提供上下文上限，無法計算剩餘容量。") + '</p></div>';
+    const scale = Math.max(win, total);
     const seg = (n, cls, name) => n > 0 ? '<i class="' + cls + '" style="width:' + Math.max(0.6, (n / scale) * 100) + '%" title="' + name + " " + tokens(n) + '"></i>' : "";
     return '<div class="us-ctx"><div class="us-row"><span>' + PR.t("上下文") + "</span><em>" + tokens(total) + (win ? " / " + tokens(win) + PR.t("（{pct}%）", { pct: Math.max(1, Math.round((total / win) * 100)) }) : " token") + "</em></div>" +
       '<div class="us-bar us-stack">' + seg(c.cached, "cached", PR.t("缓存命中（系统提示、之前的对话）")) + seg(c.fresh, "fresh", PR.t("这次新发的（问题、引用的段落）")) + seg(c.output, "out", PR.t("回答")) + "</div>" +
@@ -111,9 +112,9 @@ window.PR = window.PR || {};
   }
 
   /* 点圆环弹出的用量面板 */
-  PR.usagePop = function (latest, msgs) {
-    const bars = latest && latest.limits ? PR.usageBars(latest.limits, PR.t("Claude 订阅用量")) : "";
-    return '<div class="us-pop">' + contextHtml(msgs) + bars +
+  PR.usagePop = function (latest, msgs, engine) {
+    const bars = engine === "claude" && latest && latest.limits ? PR.usageBars(latest.limits, PR.t("Claude 订阅用量")) : "";
+    return '<div class="us-pop">' + (engine !== "claude" && PR.quotaHtml ? PR.quotaHtml(engine) : "") + contextHtml(msgs) + bars +
       (bars ? '<div class="us-foot">' + PR.t("整个账号共用，含其他用途 · 更新于 {ago}", { ago: ago(latest.at) }) + "</div>" : "") + "</div>";
   };
 })(window.PR);

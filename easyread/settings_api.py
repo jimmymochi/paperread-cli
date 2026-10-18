@@ -56,5 +56,14 @@ def agy_models(body: dict) -> dict:
     return {"models": agy.models(cfg["agy"], fresh=True), "found": detect.detect(cfg, fresh=True)}
 
 
+def account_quota(body: dict) -> dict:
+    from . import quota
+    engine = body.get("engine")
+    if engine not in ("agy", "codex"):
+        return {"status": "unavailable", "reason": "unsupported", "rows": []}
+    return quota.read(engine, fresh=body.get("refresh") is True)
+
+
 POST = {"/api/config": save_config, "/api/chat/models": save_chat_models,
-        "/api/config/test": test_engine, "/api/models/list": list_models, "/api/agy/models": agy_models}
+        "/api/config/test": test_engine, "/api/models/list": list_models, "/api/agy/models": agy_models,
+        "/api/usage/limits": account_quota}

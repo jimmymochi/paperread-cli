@@ -5,7 +5,7 @@
 (function (PR) {
   "use strict";
   const dlg = () => PR.$("#settingsDlg");
-  const ALL_TABS = [["chat", PR.t("模型")], ["reading", PR.t("阅读")], ["library", PR.t("侧边栏")], ["keys", PR.t("快捷键")]];
+  const ALL_TABS = [["chat", PR.t("模型")], ["quota", PR.t("AI 額度")], ["reading", PR.t("阅读")], ["library", PR.t("侧边栏")], ["keys", PR.t("快捷键")]];
   const tabs = () => ALL_TABS.filter(([k]) => PR.settingsTabs[k]);  // “侧边栏”页只在文献库页面有
   PR.settingsTabs = PR.settingsTabs || {};
   const st = (PR.settingsState = { tab: "chat", cfg: null, presets: [], groups: [], found: null, chat: null, ui: null });
@@ -20,6 +20,7 @@
       theme: PR.ls.get("easyread-prefs", {}).theme || "auto", recording: null, editing: null, form: null, chatKeys: null, type: null, transChecked: false, pinned: false });
     render();
     dlg().classList.add("open");
+    if (PR.settingsTabs[st.tab] && PR.settingsTabs[st.tab].load) PR.settingsTabs[st.tab].load();
     // 每次打开都问一次（后端有缓存，很快）：刚装好或更新了 Claude Code / Codex，版本号和模型名单马上跟上
     const r = await PR.api("/api/engines").catch(() => null);
     if (r && (JSON.stringify([r.found, r.models]) !== JSON.stringify([st.found, st.models]))) {
@@ -44,7 +45,7 @@
     dlg().querySelector(".dialog").innerHTML =
       '<div class="set-head"><h2>' + PR.t("设置") + '</h2><div class="set-tabs">' + tabs().map(([k, l]) => '<button data-set-tab="' + k + '" class="' + (st.tab === k ? "on" : "") + '">' + l + "</button>").join("") + "</div>" + (st.tab === "chat" ? saveStatusHtml() : "") + "</div>" +
       '<div class="set-body">' + (t ? t.render(st) : "") + "</div>" +
-      '<div class="actions set-foot"><button class="linkish" id="showLog">' + PR.t("运行日志") + '</button><span class="grow"></span><button class="btn" id="setCancel">' + (st.tab === "chat" ? PR.t("关闭") : PR.t("取消")) + '</button>' + (st.tab === "chat" ? "" : '<button class="btn primary" id="setSave">' + PR.t("保存") + "</button>") + "</div>";
+      '<div class="actions set-foot"><button class="linkish" id="showLog">' + PR.t("运行日志") + '</button><span class="grow"></span><button class="btn" id="setCancel">' + (["chat", "quota"].includes(st.tab) ? PR.t("关闭") : PR.t("取消")) + '</button>' + (["chat", "quota"].includes(st.tab) ? "" : '<button class="btn primary" id="setSave">' + PR.t("保存") + "</button>") + "</div>";
   }
 
   function saveStatusHtml() {
@@ -119,7 +120,7 @@
   dlg().addEventListener("click", async (e) => {
     if (e.target === dlg() || e.target.closest("#setCancel")) { st.recording = null; return dlg().classList.remove("open"); }
     const tb = e.target.closest("[data-set-tab]");
-    if (tb) { sync(); st.tab = tb.dataset.setTab; st.recording = null; st.editing = null; render(); return; }
+    if (tb) { sync(); st.tab = tb.dataset.setTab; st.recording = null; st.editing = null; render(); const next = PR.settingsTabs[st.tab]; if (next && next.load) next.load(); return; }
     if (e.target.closest("#showLog")) { const r = await PR.api("/api/log"); PR.showText(PR.t("运行日志"), r.text + "\n\n" + PR.t("（完整日志：{path}）", { path: r.path })); return; }
     if (e.target.closest("#setSave")) { try { await save(); } catch (err) { PR.toast(PR.t("保存失败：{msg}", { msg: PR.esc(err.message) })); } return; }
     const t = PR.settingsTabs[st.tab];
