@@ -57,7 +57,7 @@ shasum -a 256 ~/Downloads/PaperRead-CLI-1.4.7-cli.5-macOS-arm64.dmg
 
 測試使用空白文獻庫，不使用真實 AGY／Codex 帳號，也不呼叫 AI 生成回答。這些自動測試不包含從瀏覽器下載後的 Gatekeeper 提示或所有 macOS 版本的人工操作測試。
 
-Intel 使用仍提供對應安裝包的 ONNX Runtime 1.23.2；Apple Silicon 使用 1.31.0。其餘建置版本記錄於 `requirements-build.txt` 與 `package-lock.json`。
+Intel 使用仍提供對應安裝包的 ONNX Runtime 1.23.2 與 cryptography 48.0.1；Apple Silicon 分別使用 1.31.0 與 50.0.2。其餘建置版本記錄於 `requirements-build.txt` 與 `package-lock.json`。CI 只接受預先編譯的套件，避免在不同機器臨時編譯而改變最低系統需求。
 
 本機建置必須在相同晶片架構的 Mac 上執行，需 Python 3.13、Node.js 22、Xcode Command Line Tools：
 
