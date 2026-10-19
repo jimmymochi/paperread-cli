@@ -1,4 +1,4 @@
-"""Collect dependency notices for the redistributed Windows application."""
+"""Collect dependency notices for the redistributed desktop application."""
 import importlib.metadata
 import json
 import re

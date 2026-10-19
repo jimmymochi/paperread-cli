@@ -11,7 +11,8 @@
     "dev": "electron .",
     "start": "electron .",
     "build:backend": "python scripts/build_backend.py",
-    "dist": "npm run build:backend && electron-builder --publish never"
+    "dist": "npm run build:backend && electron-builder --publish never",
+    "dist:mac": "npm run build:backend && electron-builder --mac dmg --publish never"
   },
   "devDependencies": {
     "electron": "^44.5.1",
@@ -54,6 +55,10 @@
         "to": "分享版說明.md"
       },
       {
+        "from": "macOS安裝說明.md",
+        "to": "macOS安裝說明.md"
+      },
+      {
         "from": "build/third-party-licenses",
         "to": "third-party-licenses"
       }
@@ -88,15 +93,15 @@
       "icon": "electron/assets/icon.png",
       "target": [
         {
-          "target": "dmg",
-          "arch": [
-            "arm64"
-          ]
+          "target": "dmg"
         }
       ],
-      "category": "publications",
+      "artifactName": "PaperRead-CLI-${version}-macOS-${arch}.${ext}",
+      "category": "public.app-category.education",
+      "minimumSystemVersion": "14.0",
       "identity": "-",
-      "hardenedRuntime": false
+      "hardenedRuntime": false,
+      "notarize": false
     },
     "linux": {
       "icon": "electron/assets/icon.png",

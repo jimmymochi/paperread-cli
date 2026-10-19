@@ -1,0 +1,116 @@
+name: Build macOS CLI installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish a macOS release after both architectures pass
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-cli-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: macOS ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONUTF8: "1"
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install backend dependencies for this architecture
+        run: |
+          python -m venv .venv
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+          .venv/bin/python -m pip install -r requirements-build.txt
+          .venv/bin/python -m pip install --no-deps -e .
+          .venv/bin/python -m pip check
+      - run: npm ci
+      - name: Test desktop controls and CLI integration
+        run: |
+          node --test tests/test_*.cjs
+          python -m pytest tests/test_agy.py tests/test_quota.py tests/test_usage.py tests/test_i18n.py -q
+      - name: Build native Python backend
+        run: python scripts/build_backend.py
+      - name: Package macOS disk image
+        run: npx electron-builder --mac dmg --${{ matrix.arch }} --publish never
+      - name: Mount installer and test the copied application
+        run: |
+          dmg=$(find dist/electron -maxdepth 1 -name '*-macOS-${{ matrix.arch }}.dmg' -print)
+          test -n "$dmg"
+          hdiutil verify "$dmg"
+          mount="$RUNNER_TEMP/paperread-dmg"
+          mkdir -p "$mount"
+          hdiutil attach "$dmg" -readonly -nobrowse -mountpoint "$mount"
+          trap 'hdiutil detach "$mount"' EXIT
+          installed="$RUNNER_TEMP/Installed Apps/PaperRead CLI.app"
+          mkdir -p "$(dirname "$installed")"
+          ditto "$mount/PaperRead CLI.app" "$installed"
+          python scripts/smoke_macos.py "$installed" --arch '${{ matrix.arch }}'
+      - name: Upload verified installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: paperread-cli-macos-${{ matrix.arch }}
+          path: dist/electron/*-macOS-${{ matrix.arch }}.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish verified Mac installers
+    if: inputs.publish
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: paperread-cli-macos-*
+          merge-multiple: true
+          path: mac-release
+      - name: Prepare source, guide and checksums
+        shell: bash
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
+          echo "MAC_TAG=macos-v$version" >> "$GITHUB_ENV"
+          git archive --format=zip --prefix=PaperRead-CLI/ --output="mac-release/PaperRead-CLI-Source-$version-macOS.zip" HEAD
+          cp macOS安裝說明.md mac-release/README-macOS.md
+          cd mac-release
+          sha256sum *.dmg *.zip README-macOS.md > SHA256SUMS-macOS.txt
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "$MAC_TAG" mac-release/* \
+            --target "$GITHUB_SHA" \
+            --title "PaperRead CLI $APP_VERSION — macOS" \
+            --notes-file macOS安裝說明.md \
+            --latest=false
