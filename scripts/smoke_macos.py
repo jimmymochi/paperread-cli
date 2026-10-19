@@ -37,10 +37,8 @@ def main():
 
     # Run the signed, bundled backend, not the source-tree Python environment.
     subprocess.run([sys.executable, "scripts/smoke_backend.py", str(backend)], check=True)
-    # macOS resolves Application Support through the signed-in user's account;
-    # changing HOME does not reliably relocate Electron's native appData path.
-    # The runner is ephemeral. Isolate the library explicitly, and inspect only
-    # startup messages appended by this launch in the runner's real appData.
+    # The runner is ephemeral. Isolate the library with the normal desktop
+    # data-dir option, and inspect only this launch's native appData messages.
     startup_log = Path.home() / "Library/Application Support/PaperReadCLI/startup.log"
     log_offset = startup_log.stat().st_size if startup_log.exists() else 0
     with tempfile.TemporaryDirectory(prefix="paperread-macos-app-") as tmp:
@@ -48,8 +46,12 @@ def main():
         data = home / "isolated data"
         data.mkdir()
         (data / "config.json").write_text(json.dumps({"engine": "none"}), encoding="utf-8")
-        env = dict(os.environ, EASYREAD_HOME=str(data), EASYREAD_LIBRARY=str(data / "library"))
+        env = dict(os.environ, EASYREAD_HOME=str(data))
         env.pop("ELECTRON_RUN_AS_NODE", None)
+        # Temporary-library mode deliberately omits .server.json. Use the
+        # normal desktop mode so the HTTP probe follows the installed app.
+        env.pop("EASYREAD_LIBRARY", None)
+        env.pop("COREAD_LIBRARY", None)
         with (home / "desktop.log").open("w", encoding="utf-8") as log:
             proc = subprocess.Popen([str(executable), "--data-dir", str(data)], env=env,
                                     stdout=log, stderr=log, start_new_session=True)
