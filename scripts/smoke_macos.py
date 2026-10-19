@@ -11,6 +11,7 @@ from pathlib import Path
 import plistlib
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.request
@@ -35,7 +36,13 @@ def main():
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
 
     # Run the signed, bundled backend, not the source-tree Python environment.
-    subprocess.run(["python", "scripts/smoke_backend.py", str(backend)], check=True)
+    subprocess.run([sys.executable, "scripts/smoke_backend.py", str(backend)], check=True)
+    # macOS resolves Application Support through the signed-in user's account;
+    # changing HOME does not reliably relocate Electron's native appData path.
+    # The runner is ephemeral. Isolate the library explicitly, and inspect only
+    # startup messages appended by this launch in the runner's real appData.
+    startup_log = Path.home() / "Library/Application Support/PaperReadCLI/startup.log"
+    log_offset = startup_log.stat().st_size if startup_log.exists() else 0
     with tempfile.TemporaryDirectory(prefix="paperread-macos-app-") as tmp:
         home = Path(tmp)
         data = home / "isolated data"
@@ -43,8 +50,6 @@ def main():
         (data / "config.json").write_text(json.dumps({"engine": "none"}), encoding="utf-8")
         env = dict(os.environ, EASYREAD_HOME=str(data), EASYREAD_LIBRARY=str(data / "library"))
         env.pop("ELECTRON_RUN_AS_NODE", None)
-        # HOME isolates Electron preferences as well as the test library.
-        env["HOME"] = str(home)
         with (home / "desktop.log").open("w", encoding="utf-8") as log:
             proc = subprocess.Popen([str(executable), "--data-dir", str(data)], env=env,
                                     stdout=log, stderr=log, start_new_session=True)
@@ -62,12 +67,15 @@ def main():
                         assert library["version"] == info["CFBundleShortVersionString"], library["version"]
                         assert not library["items"], "Desktop did not use the isolated library"
                         # Electron writes this only after its BrowserWindow loaded the library.
-                        logs = home.glob("Library/Application Support/PaperReadCLI/startup.log")
-                        loaded = any("startup library-loaded" in p.read_text(encoding="utf-8") for p in logs)
+                        recent = startup_log.read_bytes()[log_offset:].decode("utf-8") if startup_log.exists() else ""
+                        loaded = "startup library-loaded" in recent
                         if loaded:
                             break
                     time.sleep(0.5)
-                assert loaded, "Desktop window did not finish loading the isolated library"
+                if not loaded:
+                    recent = startup_log.read_bytes()[log_offset:].decode("utf-8") if startup_log.exists() else "(no startup log)"
+                    stderr = (home / "desktop.log").read_text(encoding="utf-8", errors="replace")
+                    raise RuntimeError(f"Desktop did not finish loading; server file exists={state_file.exists()}\n{recent}\n{stderr[-5000:]}")
             finally:
                 if proc.poll() is None:
                     os.killpg(proc.pid, signal.SIGTERM)
