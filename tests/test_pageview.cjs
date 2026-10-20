@@ -126,6 +126,16 @@ test("legacy single boxes work and layout refresh replaces the visible regions",
   assert.equal(r.node(".pv-hl").children.length, 2);
 });
 
+test("paper metadata refresh replaces stale PDF images without a layout change", () => {
+  const r = reader();
+  r.PR.openPage(2, "second");
+  assert.equal(r.node(".pv-page img").src, "/p/paper/pages/two.webp?w=1000");
+  r.PR.state.paper.meta.pages = [{ img: "pages/repaired-one.webp" }, { img: "pages/repaired-two.webp" }];
+  r.events.get("remote")(["paper"]);
+  assert.equal(r.node(".pv-page img").src, "/p/paper/pages/repaired-two.webp?w=1000");
+  assert.equal(r.node(".pv-label").textContent, "第 2 / 2 页");
+});
+
 
 test("continuous pages load nearby images and scrollbar updates the page without follow stealing it", () => {
   const r = reader();
