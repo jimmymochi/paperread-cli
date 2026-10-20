@@ -18,8 +18,8 @@
 
 | 平台 | 下載與說明 |
 |---|---|
-| Windows x64 | [Windows 安裝檔](https://github.com/jimmymochi/paperread-cli/releases/tag/cli-v1.4.7-5) |
-| macOS Apple Silicon／Intel | [Mac DMG 安裝檔](https://github.com/jimmymochi/paperread-cli/releases/tag/macos-v1.4.7-cli.5) · [Mac 安裝說明](macOS安裝說明.md) |
+| Windows x64 | [Windows 安裝檔](https://github.com/jimmymochi/paperread-cli/releases/tag/cli-v1.4.7-6) |
+| macOS Apple Silicon／Intel | [Mac DMG 安裝檔](https://github.com/jimmymochi/paperread-cli/releases/tag/macos-v1.4.7-cli.6) · [Mac 安裝說明](macOS安裝說明.md) |
 
 Mac 版需求為 macOS 14 以上，使用 ad-hoc 簽署，尚未經 Apple 公證。請依晶片選擇 arm64 或 x64。
 完整安裝、登入、資料位置與建置方式請見[分享版說明](分享版說明.md)。

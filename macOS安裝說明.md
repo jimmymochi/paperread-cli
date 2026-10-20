@@ -1,6 +1,6 @@
 # PaperRead CLI macOS 版
 
-版本：1.4.7-cli.5。這是以 [YuriyLin/PaperRead v1.4.7](https://github.com/YuriyLin/PaperRead/releases/tag/v1.4.7) 修改的非官方社群版本；原作者與貢獻者的 MIT 授權、版權及第三方套件聲明均保留。
+版本：1.4.7-cli.6。這是以 [YuriyLin/PaperRead v1.4.7](https://github.com/YuriyLin/PaperRead/releases/tag/v1.4.7) 修改的非官方社群版本；原作者與貢獻者的 MIT 授權、版權及第三方套件聲明均保留。
 
 ## 選擇安裝檔
 
@@ -8,12 +8,12 @@
 
 | 你的 Mac | 下載檔案 |
 |---|---|
-| Apple Silicon（M1、M2、M3、M4 等 M 系列晶片） | `PaperRead-CLI-1.4.7-cli.5-macOS-arm64.dmg` |
-| Intel 處理器 | `PaperRead-CLI-1.4.7-cli.5-macOS-x64.dmg` |
+| Apple Silicon（M1、M2、M3、M4 等 M 系列晶片） | `PaperRead-CLI-1.4.7-cli.6-macOS-arm64.dmg` |
+| Intel 處理器 | `PaperRead-CLI-1.4.7-cli.6-macOS-x64.dmg` |
 
 可在蘋果選單 →「關於這台 Mac」確認晶片。兩個檔案各自包含對應架構的 Electron 與 Python 後端；Apple Silicon 版不需要 Rosetta，也不必自行安裝 Python 或 Node.js。
 
-Windows 使用者請使用 [Windows 安裝版](https://github.com/jimmymochi/paperread-cli/releases/tag/cli-v1.4.7-5)。
+Windows 使用者請使用 [Windows 安裝版](https://github.com/jimmymochi/paperread-cli/releases/tag/cli-v1.4.7-6)。
 
 ## 安裝與首次開啟
 
@@ -24,7 +24,7 @@ Windows 使用者請使用 [Windows 安裝版](https://github.com/jimmymochi/pap
 可用終端機核對下載檔，例如：
 
 ```bash
-shasum -a 256 ~/Downloads/PaperRead-CLI-1.4.7-cli.5-macOS-arm64.dmg
+shasum -a 256 ~/Downloads/PaperRead-CLI-1.4.7-cli.6-macOS-arm64.dmg
 ```
 
 比對 Release 內 `SHA256SUMS-macOS.txt` 的對應項目。Intel 請改用 x64 檔名。
