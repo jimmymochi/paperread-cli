@@ -5,7 +5,7 @@
    - 离线版（导出的单文件）没有服务，队列本身就是存储，可导出后并回。 */
 (function (PR) {
   "use strict";
-  const S = (PR.state = { paper: null, discussion: { entries: [] }, reader: {}, layout: {}, item: {}, job: {}, images: {}, versions: {}, engine: "none" });
+  const S = (PR.state = { paper: null, discussion: { entries: [] }, reader: {}, layout: {}, item: {}, job: {}, preview: {}, images: {}, versions: {}, engine: "none" });
   let mode = "server";
   let serverReader = null;
   let outbox = [];
@@ -163,7 +163,7 @@
       if (!r.ok) throw new Error(r.status === 404 ? PR.t("文献库里没有这篇论文") : PR.t("读取数据失败：{status}", { status: r.status }));
       const d = await r.json();
       PR.token = d.token;
-      Object.assign(S, { paper: d.paper, discussion: d.discussion, layout: d.layout || {}, item: d.item || {}, job: d.job || {}, versions: d.versions, engine: d.engine });
+      Object.assign(S, { paper: d.paper, discussion: d.discussion, layout: d.layout || {}, item: d.item || {}, job: d.job || {}, preview: d.preview || {}, versions: d.versions, engine: d.engine });
       serverReader = d.reader || {};
     }
     const ov = (S.item || {}).meta_override || {};
@@ -181,7 +181,12 @@
   PR.canAsk = () => mode === "server" && S.engine && S.engine !== "none";
 
   /* ---------- 轮询：翻译方追加讨论/译文、后台翻译进度、另一个标签页改了笔记 ---------- */
-  async function poll() {
+  let pollPromise = null;
+  function poll() {
+    if (!pollPromise) pollPromise = pollOnce().finally(() => { pollPromise = null; });
+    return pollPromise;
+  }
+  async function pollOnce() {
     if (mode !== "server" || document.hidden) return;
     let v;
     try {
@@ -192,11 +197,16 @@
       return;
     }
     const changed = [];
-    for (const name of ["paper", "discussion", "layout", "reader", "job"]) if (v[name] && v[name] !== S.versions[name]) changed.push(name);
+    for (const name of ["paper", "discussion", "layout", "reader", "job", "preview"]) if (v[name] && v[name] !== S.versions[name]) changed.push(name);
     if (!changed.length) return;
-    for (const name of changed) {
-      if (name === "reader" && (flushing || outbox.length)) continue; // 自己正在写，等写完
-      const d = await (await fetch(base() + "/part/" + name, { cache: "no-store" })).json();
+    const parts = await Promise.all(changed.map(async name => {
+      if (name === "reader" && (flushing || outbox.length)) return null;
+      const d = await (await fetch(base() + (name === "preview" ? "/preview" : "/part/" + name), { cache: "no-store" })).json();
+      return { name, d };
+    }));
+    for (const part of parts) {
+      if (!part) continue;
+      const { name, d } = part;
       S.versions[name] = d.version;
       if (name === "reader") { serverReader = d.data; rebuildReader(); } else S[name] = d.data || {};
     }
@@ -206,7 +216,11 @@
   PR.poll = poll;
   PR.startPolling = function () {
     if (mode !== "server") return;
-    setInterval(poll, 2500);
+    async function tick() {
+      try { await poll(); } catch (e) { /* Retry on the next tick. */ }
+      setTimeout(tick, ["queued", "running"].includes(S.job.state) ? 500 : 2500);
+    }
+    setTimeout(tick, 500);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
     window.addEventListener("focus", poll);
     window.addEventListener("online", flush);
@@ -220,20 +234,35 @@
   });
 
   /* 让模型做事（回答问题、重译一段）：交给服务的小任务队列 */
-  PR.ask = async function (kind, body) {
+  const pendingAsks = new Map();
+  PR.ask = function (kind, body) {
+    const signature = JSON.stringify([kind, body]);
+    if (kind === "retranslate" && pendingAsks.has(signature)) return pendingAsks.get(signature);
+    const promise = ask(kind, body, signature);
+    if (kind === "retranslate") pendingAsks.set(signature, promise);
+    promise.catch(() => pendingAsks.delete(signature));
+    return promise;
+  };
+  async function ask(kind, body, signature) {
     const job = await PR.api(base() + "/" + kind, { method: "POST", body });
     PR.emit("job-started", job);
-    const t = setInterval(async () => {
-      const list = (await PR.api("/api/jobs?pid=" + encodeURIComponent(PR.pid))).jobs;
-      const j = list.find((x) => x.id === job.id);
-      if (!j || ["done", "error"].includes(j.state)) {
-        clearInterval(t);
-        await poll();
-        PR.emit("job-finished", j || job);
-      }
-    }, 2000);
+    async function watch() {
+      try {
+        const list = (await PR.api("/api/jobs?pid=" + encodeURIComponent(PR.pid))).jobs;
+        const j = list.find((x) => x.id === job.id);
+        if (!j || ["done", "error", "cancelled"].includes(j.state)) {
+          pendingAsks.delete(signature);
+          await poll();
+          PR.emit("job-finished", j || job);
+          return;
+        }
+        PR.emit("job-progress", j);
+      } catch (e) { /* Keep the existing job; never resubmit on a polling failure. */ }
+      setTimeout(watch, 500);
+    }
+    setTimeout(watch, 500);
     return job;
-  };
+  }
 
   /* ---------- 导出 ---------- */
   PR.exportOps = function () {

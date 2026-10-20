@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from easyread import config
 from easyread.jobs import Jobs
 from easyread.library import Library
 from easyread.store import Workspace, write_json_atomic
@@ -82,13 +83,34 @@ class JobsTest(unittest.TestCase):
         states = []
         with patch("easyread.jobs.threading.Thread.start", side_effect=lambda: states.append(self.ws.load("job")["state"])):
             resumed = Jobs(self.lib)
-        self.assertEqual(states, ["queued", "queued"])
+        self.assertEqual(states, ["queued", "queued", "queued"])
         self.assertEqual(resumed.bulk.qsize(), 1)
 
     def test_small_job_ids_are_unique_with_frozen_clock(self):
         with patch("time.time", return_value=1):
             ids = {self.jobs.submit_small("answer", self.ws.id, note="n1")["id"] for _ in range(10)}
         self.assertEqual(len(ids), 10)
+
+    def test_identical_retranslations_share_only_active_request(self):
+        first = self.jobs.submit_small("retranslate", self.ws.id, key="p1", hint="")
+        same = self.jobs.submit_small("retranslate", self.ws.id, key="p1", hint="")
+        self.assertIs(same, first)
+        self.assertEqual(self.jobs.small.qsize(), 1)
+        self.assertNotIn("_signature", self.jobs.small_status()[0])
+        different = self.jobs.submit_small("retranslate", self.ws.id, key="p1", hint="different")
+        self.assertNotEqual(first["id"], different["id"])
+        first["state"] = "done"
+        again = self.jobs.submit_small("retranslate", self.ws.id, key="p1", hint="")
+        self.assertNotEqual(first["id"], again["id"])
+
+    def test_changed_source_or_cancelled_request_is_not_reused(self):
+        first = self.jobs.submit_small("retranslate", self.ws.id, key="p1")
+        self.jobs.cancel_small(first["id"])
+        second = self.jobs.submit_small("retranslate", self.ws.id, key="p1")
+        self.assertNotEqual(first["id"], second["id"])
+        self.ws.update("paper", lambda p: p.update(blocks=[{"id": "p1", "zh": "new"}]))
+        third = self.jobs.submit_small("retranslate", self.ws.id, key="p1")
+        self.assertNotEqual(second["id"], third["id"])
 
     def test_removed_paper_does_not_leave_small_job_queued_forever(self):
         job = self.jobs.submit_small("answer", self.ws.id, note="n1")

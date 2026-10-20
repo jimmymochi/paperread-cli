@@ -1,4 +1,5 @@
 {
+ "譯文預覽 · 完成檢查後會自動存入正文": "Translation preview · Saved to the paper after validation",
  "AI 額度": "AI quotas",
  "CLI 未提供上下文上限，無法計算剩餘容量。": "The CLI did not report a context limit, so remaining capacity is unavailable.",
  "最近一次呼叫": "Last request",

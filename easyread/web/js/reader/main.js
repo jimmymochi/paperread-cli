@@ -76,6 +76,7 @@
 
   const seen = new Set();
   PR.on("remote", (changed) => {
+    if (changed.every(name => name === "preview")) return;
     if (changed.includes("job")) PR.renderJobState();
     const after = () => {
       if (changed.includes("paper") || changed.includes("reader")) {

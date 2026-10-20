@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import queue
+import hashlib
+import json
 import threading
 import time
+from datetime import datetime
 from uuid import uuid4
 
 from . import chat_models, config, langs, translate, usage
@@ -12,7 +15,8 @@ from .engines import Cancelled, EngineError
 from .i18n import tr
 from .library import Library
 from .log import log
-from .store import Workspace, now_iso
+from .store import Workspace, now_iso, file_version
+from .translation_progress import RequestSlots
 
 
 def engine_for(cfg: dict, model: str | None) -> dict:
@@ -36,8 +40,11 @@ class Jobs:
         self.small_cancels: dict[str, threading.Event] = {}
         self.recent: list[dict] = []  # 小任务的状态，给页面轮询
         self.lock = threading.Lock()
+        self.slots = RequestSlots()
+        self.previews: dict[str, dict] = {}
         self._resume()
-        for target in (self._bulk_loop, self._small_loop):
+        # Two papers may progress together, sharing the same total CLI budget.
+        for target in (self._bulk_loop, self._bulk_loop, self._small_loop):
             threading.Thread(target=target, daemon=True).start()
 
     # ---------- 整篇 ----------
@@ -61,7 +68,7 @@ class Jobs:
             job.update(type="read" if read and translate_after else "translate" if translate_after else "prepare",
                        state="queued", message=tr("排队中"), pages=pages, scope=scope or "all", translate=translate_after, read=read, model=model or "",
                        confirmed=confirmed is True, target=target, cap_check=cap_check is True,
-                       done=0, total=0, error="", failed={}, updated=now_iso(), usage={})
+                       done=0, total=0, error="", failed={}, updated=now_iso(), queued_at=now_iso(), usage={}, performance={})
             job.pop("page_cap", None)
         with self.lock:
             ws.update("job", apply)
@@ -85,6 +92,21 @@ class Jobs:
             if job.get("state") in ("queued", "running"):
                 self._write(ws, state="queued", message=tr("排队中（服务重启后继续）"))
                 self.bulk.put(ws.id)
+
+    def preview(self, pid):
+        with self.lock:
+            value = self.previews.get(pid, {})
+            return {"version": str(value.get("revision", 0)), "data": {"batches": list(value.get("batches", {}).values())}}
+
+    def _preview(self, pid, event):
+        with self.lock:
+            value = self.previews.setdefault(pid, {"revision": 0, "batches": {}})
+            key = tuple(event["pages"])
+            if event["phase"] == "clear":
+                value["batches"].pop(key, None)
+            else:
+                value["batches"][key] = event
+            value["revision"] += 1
 
     def _bulk_loop(self):
         while True:
@@ -115,6 +137,12 @@ class Jobs:
                     self.cancels.pop(pid, None)
 
     def _run_bulk(self, ws: Workspace, job: dict, cancel: threading.Event):
+        entered = time.monotonic()
+        try:
+            queued_seconds = max(0, time.time() - datetime.fromisoformat(job.get("queued_at") or job["updated"]).timestamp())
+        except (KeyError, ValueError, TypeError):
+            queued_seconds = 0
+        prepare_seconds = 0
         cfg = engine_for(config.load(), job.get("model"))
         if job.get("target"):
             cfg = {**cfg, "target": langs.valid(job["target"])}
@@ -122,7 +150,9 @@ class Jobs:
             raise Cancelled()
         if not ws.load("paper").get("meta", {}).get("pages"):
             self._write(ws, state="running", message=tr("正在渲染原页、抽取文字"))
+            preparing = time.monotonic()
             translate.prepare(ws)
+            prepare_seconds = time.monotonic() - preparing
         if cancel.is_set():
             raise Cancelled()
         read = bool(job.get("read"))
@@ -155,6 +185,11 @@ class Jobs:
             return
 
         meter = usage.Meter(cfg.get("engine") or "")
+        metrics, metrics_lock = [], threading.Lock()
+
+        def measured(value):
+            with metrics_lock:
+                metrics.append(value)
 
         def report(done, total, message):
             if cancel.is_set():
@@ -163,11 +198,15 @@ class Jobs:
 
         started = time.time()
         try:
-            failed = translate.translate_pages(ws, cfg, pages, cancel, report, meter, read)
+            failed = translate.translate_pages(ws, cfg, pages, cancel, report, meter, read,
+                                               preview=lambda e: self._preview(ws.id, e), performance=measured, gate=self.slots)
         finally:  # 取消、出错也把已经花掉的记上
             run = meter.snapshot()
             if run["calls"]:
                 ws.update("job", lambda j: j.update(usage=run, usage_total=usage.merge(j.get("usage_total"), run)))
+            self._write(ws, performance={"seconds": round(time.monotonic() - entered, 4),
+                                        "queue_seconds": round(queued_seconds, 4),
+                                        "prepare_seconds": round(prepare_seconds, 4), "batches": metrics})
         minutes = max(1, round((time.time() - started) / 60))
         if failed:
             first = next(iter(failed.values()))
@@ -181,11 +220,27 @@ class Jobs:
 
     # ---------- 小任务 ----------
     def submit_small(self, kind: str, pid: str, **kw) -> dict:
+        signature = ""
+        if kind == "retranslate":
+            ws = self.lib.ws(pid)
+            versions = ws.versions() if ws else {}
+            raw = json.dumps([pid, kind, kw, versions.get("paper"), versions.get("reader"),
+                              file_version(config.CONFIG_PATH)], sort_keys=True, ensure_ascii=False)
+            signature = hashlib.sha256(raw.encode()).hexdigest()
         job = {"id": "j" + uuid4().hex, "kind": kind, "pid": pid, "state": "queued", "message": tr("排队中"),
                "at": now_iso(), **kw}
         with self.lock:
-            self.recent = ([job] + self.recent)[:50]
-        self.small.put(job)
+            if signature:
+                existing = next((j for j in self.recent if j.get("_signature") == signature
+                                 and j["state"] in ("queued", "running")
+                                 and not self.small_cancels.get(j["id"], threading.Event()).is_set()), None)
+                if existing:
+                    return existing
+                job["_signature"] = signature
+            active = [j for j in self.recent if j["state"] in ("queued", "running")]
+            finished = [j for j in self.recent if j["state"] not in ("queued", "running")]
+            self.recent = [job] + active + finished[:50]
+            self.small.put(job)
         return job
 
     def cancel_small(self, job_id: str) -> bool:
@@ -200,7 +255,7 @@ class Jobs:
 
     def small_status(self, pid: str | None = None) -> list[dict]:
         with self.lock:
-            return [dict(j) for j in self.recent if not pid or j["pid"] == pid]
+            return [{k: v for k, v in j.items() if not k.startswith("_")} for j in self.recent if not pid or j["pid"] == pid]
 
     def busy(self) -> bool:
         """还有整篇翻译或小任务没做完（关页自动退出时要等它们）。"""
@@ -225,7 +280,14 @@ class Jobs:
                 if job["kind"] == "answer":
                     translate.answer(ws, cfg, job["note"], None)
                 elif job["kind"] == "retranslate":
-                    translate.retranslate(ws, cfg, job["key"], job.get("hint", ""), None)
+                    def preview(event):
+                        with self.lock:
+                            job["preview"] = event if event["phase"] != "clear" else {}
+                    def measured(value):
+                        with self.lock:
+                            job["performance"] = value
+                    translate.retranslate(ws, cfg, job["key"], job.get("hint", ""), cancel,
+                                          preview=preview, performance=measured, gate=self.slots)
                 elif job["kind"] == "smart-annotate":
                     from . import smart_annotations
                     result = smart_annotations.generate(

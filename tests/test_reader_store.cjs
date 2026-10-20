@@ -76,3 +76,35 @@ test("offline deletes survive delayed note creation and export/import", async ()
     assert.ok(!PR.state.reader.notes.n1.deleted);
   }
 });
+
+test("duplicate paragraph requests share one submission and polling never resubmits", async () => {
+  const timers = [], events = [], submissions = [];
+  let state = "running";
+  const PR = { t: s => s, uid: () => "client", nowIso: () => "now", emit: (...e) => events.push(e),
+    ls: { get: (_key, fallback) => fallback, set: () => true },
+    api: async (url, options) => {
+      if (options) { submissions.push(options.body); return { id: "j1", state: "queued" }; }
+      return { jobs: [{ id: "j1", kind: "retranslate", state, preview: { rows: [{ text: "preview" }] } }] };
+    },
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../easyread/web/js/reader/store.js"), "utf8"), {
+    window: { PR, addEventListener() {} }, location: { pathname: "/read/paper" },
+    document: { hidden: false, getElementById: () => null },
+    setTimeout: fn => timers.push(fn), clearTimeout() {},
+    fetch: async url => ({ ok: true, json: async () => url.endsWith("/state")
+      ? { paper: { meta: {} }, reader: {}, job: {}, versions: {}, engine: "agy" } : {} }),
+  });
+  await PR.load();
+  const first = PR.ask("retranslate", { key: "p1", hint: "" });
+  const second = PR.ask("retranslate", { key: "p1", hint: "" });
+  assert.equal(first, second);
+  await first;
+  assert.equal(submissions.length, 1);
+  await timers.shift()();
+  assert.equal(events.at(-1)[0], "job-progress");
+  state = "done";
+  await timers.shift()();
+  assert.equal(events.at(-1)[0], "job-finished");
+  await PR.ask("retranslate", { key: "p1", hint: "" });
+  assert.equal(submissions.length, 2);
+});

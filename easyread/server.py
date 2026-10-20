@@ -264,12 +264,17 @@ class Handler(BaseHTTPRequestHandler):
                 state = {**{n: ws.load(n) for n in ("paper", "discussion", "reader", "layout", "item", "job")},
                          "versions": ws.versions(), "token": app.token, "id": ws.id, "library_status": app.location.status,
                          "engine": config.load().get("engine")}
+                preview = app.jobs.preview(ws.id)
+                state["preview"] = preview["data"]
+                state["versions"]["preview"] = preview["version"]
                 # 旧论文的图按定位框补截图；等内容和版本号都取完再开始，页面轮询到 paper 变了就会重画
                 if app.location.status == "idle" and (state["job"] or {}).get("state") not in ("queued", "running"):
                     pass  # PaperRead does not generate cropped figure assets.
                 return self._json(200, state)
             if action == "versions":
-                return self._json(200, {**ws.versions(), "library_status": app.location.status})
+                return self._json(200, {**ws.versions(), "preview": app.jobs.preview(ws.id)["version"], "library_status": app.location.status})
+            if action == "preview":
+                return self._json(200, app.jobs.preview(ws.id))
             if action == "chat":
                 return self._json(200, {"threads": chat_store.threads(ws), **chat_models.listing(config.load()), "limits": usage.latest()})
             if action == "log":

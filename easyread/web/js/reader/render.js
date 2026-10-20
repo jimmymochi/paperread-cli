@@ -192,7 +192,8 @@
 
   PR.renderPaper = function () {
     buildIndex();
-    let html = headHtml() + (PR.store.mode === "server" ? PR.pageCapHtml(S.job) : ""), appendixSeen = false, lastPage = 0;
+    let html = headHtml() + '<aside id="translationPreview" class="translation-preview" hidden></aside>' +
+      (PR.store.mode === "server" ? PR.pageCapHtml(S.job) : ""), appendixSeen = false, lastPage = 0;
     const done = new Set((S.paper.translation || {}).done_pages || []);
     const allPages = (S.paper.meta || {}).pages || [];
     for (const raw of S.paper.blocks || []) {
