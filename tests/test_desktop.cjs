@@ -32,6 +32,8 @@ async function desktop(platform = "darwin", lock = true, ready = true, argv = []
     show() { this.shown = true; }
     focus() { this.focused = true; }
     isMinimized() { return false; }
+    isFullScreen() { return !!this.fullScreen; }
+    setFullScreen(value) { this.fullScreen = value; }
     close() { this.closed = true; this.emit("closed"); }
   }
   const Menu = {
@@ -110,6 +112,34 @@ test("a second app instance exits before starting a backend", async () => {
 test("Windows retains its existing menu behavior", async () => {
   const d = await desktop("win32");
   assert.equal(d.app.menu, null);
+  d.app.quit();
+});
+
+test("F11 toggles native fullscreen and Escape exits without consuming ordinary Escape", async () => {
+  const d = await desktop("win32");
+  const win = d.windows[0];
+  let prevented = 0;
+  const key = (key, extra = {}) => win.webContents.emit("before-input-event", { preventDefault() { prevented++; } }, { type: "keyDown", key, ...extra });
+  key("F11");
+  assert.equal(win.isFullScreen(), true);
+  key("F11", { isAutoRepeat: true });
+  assert.equal(win.isFullScreen(), true, "holding F11 must not flicker between modes");
+  key("Escape");
+  assert.equal(win.isFullScreen(), false);
+  assert.equal(prevented, 2);
+  key("Escape"); key("F11", { control: true }); key("F11", { type: "keyUp" });
+  assert.equal(prevented, 2, "normal editing and reader shortcuts remain available");
+  key("F11"); key("F11");
+  assert.equal(win.isFullScreen(), false);
+  d.app.quit();
+});
+
+test("macOS supports Control-Command-F for native fullscreen", async () => {
+  const d = await desktop("darwin");
+  const win = d.windows[0];
+  const key = () => win.webContents.emit("before-input-event", { preventDefault() {} }, { type: "keyDown", key: "f", control: true, meta: true });
+  key(); assert.equal(win.isFullScreen(), true);
+  key(); assert.equal(win.isFullScreen(), false);
   d.app.quit();
 });
 

@@ -11,7 +11,7 @@
 
 This is an unofficial community modification, with no official affiliation with or endorsement by the upstream authors, Google, or OpenAI.
 
-Download the [Windows x64 installer](https://github.com/jimmymochi/paperread-cli/releases/tag/cli-v1.4.7-6) or [macOS Apple Silicon / Intel DMG](https://github.com/jimmymochi/paperread-cli/releases/tag/macos-v1.4.7-cli.6). Mac builds require macOS 14 or later and are ad-hoc signed, without Apple notarization. See the [installation guide (Traditional Chinese)](分享版說明.md), [Mac setup guide](macOS安裝說明.md), and report issues to [this repository](https://github.com/jimmymochi/paperread-cli/issues).
+Download the [Windows x64 installer](https://github.com/jimmymochi/paperread-cli/releases/tag/cli-v1.4.7-7) or [macOS Apple Silicon / Intel DMG](https://github.com/jimmymochi/paperread-cli/releases/tag/macos-v1.4.7-cli.7). Mac builds require macOS 14 or later and are ad-hoc signed, without Apple notarization. See the [installation guide (Traditional Chinese)](分享版說明.md), [Mac setup guide](macOS安裝說明.md), and report issues to [this repository](https://github.com/jimmymochi/paperread-cli/issues).
 
 ---
 

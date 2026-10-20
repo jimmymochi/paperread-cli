@@ -54,6 +54,7 @@ jobs:
       - name: Test desktop controls and CLI integration
         run: |
           node --test tests/test_*.cjs
+          npx electron scripts/smoke_library_layout.cjs
           python -m pytest tests/test_agy.py tests/test_quota.py tests/test_usage.py tests/test_i18n.py tests/test_translation_progress.py tests/test_translation_parallel.py tests/test_jobs.py tests/test_translate.py tests/test_store_read_retry.py -q
       - name: Build native Python backend
         run: python scripts/build_backend.py

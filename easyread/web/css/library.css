@@ -97,6 +97,7 @@
 
 /* 详情 */
 .detail { border-left: 1px solid var(--rule); background: var(--surface); overflow-y: auto; overflow-x: hidden; }
+.lib:not(.has-detail) > .detail { display: none; } /* A 1px border in a zero-width track otherwise overflows the viewport. */
 .detail-inner { padding: 22px 24px 50px; width: 400px; }
 .detail .cover { display: flex; gap: 16px; }
 .detail .cover .thumb { width: 92px; height: 120px; flex: none; }

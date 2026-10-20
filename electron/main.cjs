@@ -272,6 +272,21 @@ async function createWindow() {
     if (/^obsidian:/i.test(target)) shell.openExternal(target);
     return { action: "deny" };
   });
+  // Windows has no application menu, so wire native fullscreen explicitly.
+  // Keep ordinary Escape available to the reader and its dialogs.
+  const fullScreenWindow = mainWindow;
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown" || input.isAutoRepeat) return;
+    const f11 = input.key === "F11" && !input.control && !input.meta && !input.alt && !input.shift;
+    const macFullScreen = process.platform === "darwin" && input.key.toLowerCase() === "f" && input.control && input.meta && !input.alt && !input.shift;
+    if (f11 || macFullScreen) {
+      event.preventDefault();
+      fullScreenWindow.setFullScreen(!fullScreenWindow.isFullScreen());
+    } else if (input.key === "Escape" && fullScreenWindow.isFullScreen()) {
+      event.preventDefault();
+      fullScreenWindow.setFullScreen(false);
+    }
+  });
   // A native context menu is separate from the application Edit menu.
   // Electron does not emit this event when the page prevents contextmenu,
   // so the library's and reader's custom menus keep working.
