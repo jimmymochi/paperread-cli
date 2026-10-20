@@ -130,8 +130,11 @@ def _page_stream(extract_dir: Path, n: int):
         return None
     chars = json.loads(path.read_text(encoding="utf-8"))
     text, idx = [], []
+    # A page repeats the same small alphabet thousands of times. Normalize each
+    # distinct character once, retaining exactly the original character indices.
+    norm_char = lru_cache(maxsize=256)(_norm)
     for k, c in enumerate(chars):
-        for t in _norm(c[0]):  # 连字 ﬁ/ﬂ 会展开成两个字母，指向同一个字符框
+        for t in norm_char(c[0]):  # 连字 ﬁ/ﬂ 会展开成两个字母，指向同一个字符框
             text.append(t)
             idx.append(k)
     return "".join(text), idx, chars

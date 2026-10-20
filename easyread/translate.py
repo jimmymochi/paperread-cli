@@ -16,6 +16,7 @@ from .i18n import tr
 from .log import log
 from .paperdata import add_discussion, fill_zh, merge_blocks, set_block_text
 from .store import Workspace, now_iso
+from .translation_progress import Capture
 
 _merge_lock = threading.Lock()  # 并发翻译时，并入 paper.json 和重算原页定位一次只做一个
 # 用量到顶、余额不足这类错误，后面的批次也一定失败：直接停，剩下的页记为没译，等额度恢复后一键重试
@@ -257,7 +258,8 @@ def _batches(pages: list[int], size: int, en_pages: set[int]) -> list[list[int]]
     return out
 
 
-def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, meter=None, read=False) -> dict[int, str]:
+def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, meter=None, read=False,
+                    preview=None, performance=None, gate=None) -> dict[int, str]:
     """翻译给定的页（已完成的页会重译并替换；只读原文整理过的页就地补译文）。report(done, total, message)；
     meter 收集 token 用量。read：只读原文，把页整理成块但不翻译。返回没做成的页 {页码: 原因}。"""
     cfg = engines.for_translation(cfg)  # 本机 CLI 不加载用户的 MCP、多余的工具定义（问 AI 不走这里）
@@ -299,6 +301,12 @@ def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, 
             report(state["done"], len(pages), text)
 
     def work(batch):
+        if preview or performance or gate:
+            with Capture(batch, preview, performance, gate, cancel):
+                return perform(batch)
+        return perform(batch)
+
+    def perform(batch):
         if cancel.is_set():
             return
         if state["quota"]:  # 额度用完了，不再白跑
@@ -374,7 +382,8 @@ def translate_pages(ws: Workspace, cfg: dict, pages: list[int], cancel, report, 
     if not read and len(batches) > 1 and not state["quota"] and state["ok"]:
         try:  # 检查失败或这时取消，都不影响已经译好的内容：照常结束，不算取消
             report(state["done"], len(pages), tr("正在检查术语一致性"))
-            consistency.check(ws, cfg, sorted(state["ok"]), cancel, meter, journal, _merge_lock)
+            with Capture(sorted(state["ok"]), None, performance, gate, cancel):
+                consistency.check(ws, cfg, sorted(state["ok"]), cancel, meter, journal, _merge_lock)
         except engines.Cancelled:
             journal(ws, tr("术语一致性检查已取消，译文保留"))
         except Exception as e:  # noqa: BLE001
@@ -394,7 +403,14 @@ def answer(ws: Workspace, cfg: dict, note_id: str, cancel) -> None:
     add_discussion(ws, [{"reply_to": note_id, "kind": "reply", "body": text, "by": engines.who(cfg)}])
 
 
-def retranslate(ws: Workspace, cfg: dict, key: str, hint: str, cancel) -> None:
+def retranslate(ws: Workspace, cfg: dict, key: str, hint: str, cancel, preview=None, performance=None, gate=None) -> None:
+    bid = key.partition("#")[0]
+    page = next((b.get("page", 1) for b in ws.load("paper").get("blocks", []) if b.get("id") == bid), 1)
+    with Capture([page], preview, performance, gate, cancel, key):
+        _retranslate(ws, cfg, key, hint, cancel)
+
+
+def _retranslate(ws: Workspace, cfg: dict, key: str, hint: str, cancel) -> None:
     prompt, en_ends = prompts.retranslate(ws, key, hint)
     data = engines.parse_json(engines.run(engines.for_translation(cfg), prompt, ws.root, None, cancel))
     zh = (data or {}).get("zh", "").strip() if isinstance(data, dict) else ""

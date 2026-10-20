@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+from contextlib import nullcontext
 from pathlib import Path
 
 from .i18n import tr
@@ -41,19 +42,33 @@ def engine_name(engine: str | None) -> str:
 def run(cfg: dict, prompt: str, cwd: Path, images: list[Path] | None = None, cancel: threading.Event | None = None,
         meter: usage.Meter | None = None) -> str:
     """meter：传了就把这次调用的 token 用量记进去（整篇翻译时用）。"""
-    bad = netcheck.problem(cfg)
-    if bad:
-        raise EngineError(bad)
-    try:
-        return _run(cfg, prompt, cwd, images, cancel, meter)
-    except EngineError as e:
-        raise EngineError(netcheck.explain(cfg, str(e))) from None
+    from .translation_progress import current
+    capture = current.get()
+    with capture.request(cfg, prompt, meter) if capture else nullcontext():
+        bad = netcheck.problem(cfg)
+        if bad:
+            raise EngineError(bad)
+        try:
+            text = _run(cfg, prompt, cwd, images, cancel, meter)
+            if capture and not capture.fed:
+                capture.feed(text)
+            return text
+        except EngineError as e:
+            raise EngineError(netcheck.explain(cfg, str(e))) from None
 
 
 def _run(cfg: dict, prompt: str, cwd: Path, images: list[Path] | None, cancel: threading.Event | None, meter) -> str:
     engine = cfg.get("engine")
     if engine == "agy":
-        from .agy import complete
+        from .agy import complete, stream
+        from .translation_progress import current
+        capture = current.get()
+        if capture:
+            pieces = []
+            for piece in stream(cfg["agy"], prompt, cancel, meter):
+                pieces.append(piece)
+                capture.feed(piece)
+            return "".join(pieces)
         return complete(cfg["agy"], prompt, cancel, meter)
     if engine == "claude":
         return run_claude(cfg["claude"], prompt, cwd, cancel, meter)
@@ -196,8 +211,23 @@ def _codex_once(exe: str, c: dict, prompt: str, cwd: Path, images: list[Path], c
         if c.get(field):
             args += ["-c", key + "=" + json.dumps(c[field])]
     args += extra + ["-"]
+    from .translation_progress import current
+    capture, seen = current.get(), ""
+
+    def on_line(line):
+        nonlocal seen
+        events = _json_lines(line)
+        for event in events:
+            item = event.get("item") or {}
+            if isinstance(item, dict) and item.get("type") == "agent_message" and event.get("type") in ("item.updated", "item.completed"):
+                text = item.get("text") or ""
+                if isinstance(text, str) and text.startswith(seen):
+                    capture.feed(text[len(seen):])
+                    seen = text
     try:
-        out = _communicate(_popen(args, cwd), prompt, int(c.get("timeout") or 1200), cancel)
+        proc = _popen(args, cwd)
+        out = (_communicate(proc, prompt, int(c.get("timeout") or 1200), cancel, on_line=on_line)
+               if capture else _communicate(proc, prompt, int(c.get("timeout") or 1200), cancel))
         text = Path(last).read_text(encoding="utf-8", errors="replace").strip()
     finally:
         Path(last).unlink(missing_ok=True)
@@ -217,11 +247,33 @@ def _json_lines(out: str) -> list[dict]:
     return events
 
 
-def _communicate(proc, stdin_text: str, timeout: int, cancel) -> str:
+def _communicate(proc, stdin_text: str, timeout: int, cancel, on_line=None) -> str:
     result = {}
 
     def talk():
-        result["out"], result["err"] = proc.communicate(stdin_text)
+        if on_line is None:
+            result["out"], result["err"] = proc.communicate(stdin_text)
+            return
+        lines = []
+        def write():
+            try:
+                proc.stdin.write(stdin_text)
+                proc.stdin.close()
+            except (BrokenPipeError, OSError):
+                pass
+        def errors():
+            result["err"] = proc.stderr.read()
+        writer = threading.Thread(target=write, daemon=True)
+        reader = threading.Thread(target=errors, daemon=True)
+        writer.start()
+        reader.start()
+        for line in proc.stdout:
+            lines.append(line)
+            on_line(line)
+        writer.join()
+        reader.join()
+        proc.wait()
+        result["out"] = "".join(lines)
 
     t = threading.Thread(target=talk, daemon=True)
     t.start()
